@@ -1,4 +1,10 @@
 numpy
 pandas
+matplotlib
 seaborn
+skikit-learn
+catboost
+xgboost
+optuna
+category_encoders
 -e .
