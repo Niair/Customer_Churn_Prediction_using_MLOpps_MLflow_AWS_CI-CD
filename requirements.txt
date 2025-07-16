@@ -2,9 +2,10 @@ numpy
 pandas
 matplotlib
 seaborn
-skikit-learn
+scikit-learn
 catboost
 xgboost
 optuna
 category_encoders
+lightgbm
 -e .
