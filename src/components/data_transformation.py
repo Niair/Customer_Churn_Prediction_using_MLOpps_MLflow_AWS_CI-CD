@@ -30,7 +30,27 @@ class DataTrnsformation:
                   cat_cols = ['age', 'number_of_dependents', 'zip_code', 'latitude', 'longitude', 'number_of_referrals', 'tenure_in_months', 'avg_monthly_long_distance_charges', 'avg_monthly_gb_download', 'monthly_charge', 'total_charges', 'total_refunds', 'total_extra_data_charges', 'total_long_distance_charges', 'total_revenue', 'has_offer', 'offer_popularity']
                   num_cols = ['gender', 'married', 'city', 'offer', 'phone_service', 'multiple_lines', 'internet_service', 'internet_type', 'online_security', 'online_backup', 'device_protection_plan', 'premium_tech_support', 'streaming_tv', 'streaming_movies', 'streaming_music', 'unlimited_data', 'contract', 'paperless_billing', 'payment_method', 'customer_status']
 
+                  num_pipeline = Pipeline(
+                        steps = [
+                              ("imputer", SimpleImputer(strategy = "median")),
+                              ("scaler", StandardScaler())
+                        ]
+                  )
                   
+                  cat_pipeline = Pipeline(
+                        steps = [
+                              ("impute", SimpleImputer(strategy = "most_frequent")),
+                              ("encoder", OneHotEncoder())
+                        ]
+                  )
+                  logging.info("Numerical columns scaling completed")
+                  logging.info("Categorical columns encoding completed")
+
+                  preprocessor = ColumnTransformer(
+                        [
+                              ("numerical_cols", num_pipeline, num_cols)
+                        ]
+                  )
 
 
             except Exception as e:

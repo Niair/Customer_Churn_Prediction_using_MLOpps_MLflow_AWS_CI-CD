@@ -1,0 +1,1 @@
+{"model": "XGBoost", "encoder": "onehot", "scaler": "none", "selector": "none", "classifier__n_estimators": 109, "classifier__learning_rate": 0.061721159481070736, "classifier__max_depth": 4, "classifier__subsample": 0.6260206371941118, "classifier__colsample_bytree": 0.9795542149013333, "classifier__gamma": 1}
