@@ -2,7 +2,7 @@ import os
 import sys
 from src.exception import CustomException
 from src.logger import logging
-from src.components.data_transformation import DataTrnsformation
+from src.components.data_transformation import DataTransformation
 from src.components.data_transformation import DataTransformationConfig
 
 import pandas as pd
@@ -23,7 +23,7 @@ class DataIngestion:
       def initiate_ingestion_config(self):
             logging.info("Enter in the data ingestion method or component")
             try:
-                  df = pd.read_csv("notebooks\data\processed_customer_churn_data.csv")
+                  df = pd.read_csv("notebooks\data\best_features_customer_churn_data.csv")
                   logging.info("Reading the dataset as data frame")
 
                   os.makedirs(os.path.dirname(self.ingestion_config.train_data_path), exist_ok = True)
@@ -51,5 +51,5 @@ if __name__ == '__main__':
       obj = DataIngestion()
       train_data, test_data = obj.initiate_ingestion_config()
 
-      data_transformation = DataTrnsformation()
+      data_transformation = DataTransformation()
       data_transformation.initiate_data_transformation(train_data, test_data)
