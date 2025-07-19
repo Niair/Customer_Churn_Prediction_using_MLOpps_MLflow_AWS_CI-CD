@@ -8,4 +8,6 @@ xgboost
 optuna
 category_encoders
 lightgbm
+dill
+nbformat
 -e .
