@@ -23,7 +23,7 @@ class DataIngestion:
       def initiate_ingestion_config(self):
             logging.info("Enter in the data ingestion method or component")
             try:
-                  df = pd.read_csv("notebooks\data\best_features_customer_churn_data.csv")
+                  df = pd.read_csv("notebooks/data/best_features_customer_churn_data.csv")
                   logging.info("Reading the dataset as data frame")
 
                   os.makedirs(os.path.dirname(self.ingestion_config.train_data_path), exist_ok = True)
@@ -31,6 +31,7 @@ class DataIngestion:
                   df.to_csv(self.ingestion_config.raw_data_path, index = False, header = True)
 
                   logging.info("train test split iniciated")
+                  logging.info(f"Original columns: {df.columns.tolist()}")
                   train_set, test_set = train_test_split(df, test_size = 0.2, random_state = 42)
 
                   train_set.to_csv(self.ingestion_config.train_data_path, index = False, header = True)
