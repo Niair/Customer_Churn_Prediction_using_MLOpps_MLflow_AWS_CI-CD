@@ -12,4 +12,6 @@ dill
 nbformat
 plotly
 dvc
+streamlit
+shap
 -e .
