@@ -72,6 +72,8 @@ class ModelTrainer:
                   )
 
 
+                  auc_roc = 0.0
+
                   if hasattr(best_model, "predict_proba"):
                         predicted = best_model.predict_proba(X_test)
 
@@ -79,13 +81,16 @@ class ModelTrainer:
                               auc_roc = roc_auc_score(y_test, predicted[:, 1])
                         else:
                               auc_roc = roc_auc_score(y_test, predicted, multi_class="ovr")
-                  else:
+                  elif hasattr(best_model, "decision_function"):
                         y_score = best_model.decision_function(X_test)
-
-                  if len(set(y_test)) == 2:
-                        auc_roc = roc_auc_score(y_test, y_score)
+                        if len(set(y_test)) == 2:
+                              auc_roc = roc_auc_score(y_test, y_score)
+                        else:
+                              auc_roc = roc_auc_score(y_test, y_score, multi_class="ovr")
                   else:
-                        auc_roc = roc_auc_score(y_test, y_score, multi_class="ovr")
+                        logging.warning(f"Model {best_model_name} does not have 'predict_proba' or 'decision_function'. Using 'predict' for AUC calculation, which might not be appropriate for all scenarios.")
+                        y_pred_hard = best_model.predict(X_test)
+                        auc_roc = roc_auc_score(y_test, y_pred_hard)
 
 
                   return auc_roc
