@@ -2,6 +2,10 @@ import os
 import sys
 from dataclasses import dataclass
 
+import pandas as pd
+import numpy as np
+import optuna
+
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
@@ -47,11 +51,80 @@ class ModelTrainer:
                         "Gradient Boosting": GradientBoostingClassifier(),
                         "XGBoost": XGBClassifier(),
                         "CatBoost": CatBoostClassifier(),
-                        # "LightGBMClassifier": lgb.LGBMClassifier(),
+                        "LightGBMClassifier": lgb.LGBMClassifier(),
                         "SCM": SVC(probability=True)
                   }
 
-                  model_report:dict = evaluate_models(X_train = X_train, y_train = y_train, X_test = X_test, y_test = y_test, models = models)
+                  params = {
+                        "Random Forest": {
+                              "n_estimators": [100, 500],
+                              "max_depth": [3, 30],
+                              "min_samples_split": [2, 20],
+                              "min_samples_leaf": [1, 20],
+                        },
+                        "Decision Tree": {
+                              "max_depth": [3, 30],
+                              "min_samples_split": [2, 20],
+                              "min_samples_leaf": [1, 20],
+                              "criterion": ["gini", "entropy"],
+                              "splitter": ["best", "random"],
+                        },
+                        "Logistic Regression": {
+                              "C": [1e-4, 1e2, log=True)    ,
+                              "penalty": trial.suggest_categorical("lr_penalty", ["l1", "l2", "elasticnet"]),
+                              "solver": trial.suggest_categorical("lr_solver", ["liblinear", "saga"]), # 'saga' supports elasticnet
+                              "max_iter": trial.suggest_int("lr_max_iter", 100, 1000),
+                        },
+                        "Gradient Boosting": {
+                              "n_estimators": trial.suggest_int("gb_n_estimators", 100, 500),
+                              "learning_rate": trial.suggest_float("gb_learning_rate", 0.01, 0.3, log=True),
+                              "max_depth": trial.suggest_int("gb_max_depth", 3, 10),
+                              "subsample": trial.suggest_float("gb_subsample", 0.6, 1.0),
+                              "min_samples_split": trial.suggest_int("gb_min_samples_split", 2, 20),
+                              "min_samples_leaf": trial.suggest_int("gb_min_samples_leaf", 1, 20),
+                        },
+                        "XGBoost": {
+                              "n_estimators": trial.suggest_int("xgb_n_estimators", 100, 500),
+                              "learning_rate": trial.suggest_float(
+                                    "xgb_learning_rate", 0.01, 0.3, log=True
+                              ),
+                              "max_depth": trial.suggest_int("xgb_max_depth", 3, 10),
+                              "subsample": trial.suggest_float("xgb_subsample", 0.6, 1.0),
+                              "colsample_bytree": trial.suggest_float(
+                                    "xgb_colsample_bytree", 0.6, 1.0
+                              ),
+                        },
+                        "CatBoost": {
+                              "iterations": trial.suggest_int("cb_iterations", 100, 500),
+                              "learning_rate": trial.suggest_float(
+                                    "cb_learning_rate", 0.01, 0.3, log=True
+                              ),
+                              "depth": trial.suggest_int("cb_depth", 4, 10),
+                              "l2_leaf_reg": trial.suggest_float(
+                                    "cb_l2_leaf_reg", 1e-3, 10.0, log=True
+                              ),
+                        },
+                        "LightGBMClassifier": {
+                              "n_estimators": trial.suggest_int("lgb_n_estimators", 100, 500),
+                              "learning_rate": trial.suggest_float(
+                                    "lgb_learning_rate", 0.01, 0.3, log=True
+                              ),
+                              "num_leaves": trial.suggest_int("lgb_num_leaves", 31, 511),
+                              "max_depth": trial.suggest_int("lgb_max_depth", -1, 10),
+                              "min_child_samples": trial.suggest_int(
+                                    "lgb_min_child_samples", 5, 100
+                              ),
+                        },
+                        "SCM": {
+                              "C": trial.suggest_float("svc_C", 1e-2, 1e2, log=True),
+                              "kernel": trial.suggest_categorical("svc_kernel", ["linear", "poly", "rbf", "sigmoid"]),
+                              "gamma": trial.suggest_categorical("svc_gamma", ["scale", "auto"]) if trial.suggest_categorical("svc_kernel_choice", ["linear", "poly", "rbf", "sigmoid"]) in ["rbf", "poly", "sigmoid"] else None,
+                              "degree": trial.suggest_int("svc_degree", 2, 5) if trial.suggest_categorical("svc_kernel_poly", ["linear", "poly", "rbf", "sigmoid"]) == "poly" else None,
+                              "probability": True
+                        }
+                  }
+
+                  model_report:dict = evaluate_models(X_train = X_train, y_train = y_train, X_test = X_test, y_test = y_test, models = models, param = params)
 
                   best_model_score = max(sorted(model_report.values()))
 
