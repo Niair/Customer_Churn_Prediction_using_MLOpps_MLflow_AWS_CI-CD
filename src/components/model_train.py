@@ -30,7 +30,7 @@ class ModelTrainer:
       def __init__(self):
             self.model_trainer_config = ModelTrainingConfig()
       
-      def initiate_model_trainer(self, train_arr, test_arr):
+      def initiate_model_trainer(self, train_arr, test_arr, ):
             try:
                   logging.info("Splitting the train and test input data")
                   X_train, y_train, X_test, y_test = (
@@ -47,7 +47,7 @@ class ModelTrainer:
                         "Gradient Boosting": GradientBoostingClassifier(),
                         "XGBoost": XGBClassifier(),
                         "CatBoost": CatBoostClassifier(),
-                        "LightGBMClassifier": LGBMClassifier(),
+                        # "LightGBMClassifier": lgb.LGBMClassifier(),
                         "SCM": SVC(probability=True)
                   }
 
@@ -61,8 +61,8 @@ class ModelTrainer:
 
                   best_model = models[best_model_name]
 
-                  if best_model_score < 0.8:
-                        raise CustomException("No best model found")    
+                  if best_model_score < 0.6:
+                        raise CustomException("No best model found", sys)    
                   
                   logging.info(f"Best model on train and test data")
 

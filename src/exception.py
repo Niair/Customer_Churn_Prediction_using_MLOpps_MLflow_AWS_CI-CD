@@ -1,13 +1,28 @@
 import sys
 from src.logger import logging
+import inspect
 
-def error_message_details(error, error_detail:sys):
-      _,_,exc_tb = error_detail.exc_info()
-      file_name = exc_tb.tb_frame.f_code.co_filename
-      error_message = "Error occured in the python script name [{0}] line number [{1}] error message [{2}]".format(
-            file_name, exc_tb.tb_lineno, str(error)   
-            )
-      return error_message
+def error_message_details(error, error_detail: sys):
+    try:
+        _, _, exc_tb = error_detail.exc_info()
+        if exc_tb:
+            file_name = exc_tb.tb_frame.f_code.co_filename
+            line_number = exc_tb.tb_lineno
+        else:
+            # Manually get file and line info from where the exception is raised
+            frame = inspect.currentframe().f_back
+            file_name = frame.f_code.co_filename
+            line_number = frame.f_lineno
+
+        error_message = (
+            f"Error occured in the python script name [{file_name}] "
+            f"line number [{line_number}] error message [{str(error)}]"
+        )
+        return error_message
+
+    except Exception as e:
+        return f"Exception formatting failed: {str(e)} | Original error: {str(error)}"
+
 
 class CustomException(Exception):
       def __init__(self, error_message, error_detail:sys):
@@ -16,4 +31,3 @@ class CustomException(Exception):
 
       def __str__(self):
             return self.error_message
-      

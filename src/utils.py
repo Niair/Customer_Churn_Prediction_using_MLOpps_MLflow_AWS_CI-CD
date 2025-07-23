@@ -37,7 +37,7 @@ def evaluate_models(X_train, y_train, X_test, y_test, models):
 
                   test_model_score = roc_auc_score(y_test, y_test_pred)
 
-                  report[list(models.key())[i]] = test_model_score
+                  report[list(models.keys())[i]] = test_model_score
 
             return report
 

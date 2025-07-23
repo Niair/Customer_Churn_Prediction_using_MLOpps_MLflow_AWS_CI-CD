@@ -30,12 +30,11 @@ class DataTransformation:
         
         '''
         try:
-            numerical_columns = [
-                'tenure_in_months', 'total_revenue', 'total_charges', 'total_long_distance_charges',
-                'monthly_charge', 'avg_monthly_gb_download', 'age', 'number_of_dependents', 'engagement_score',
-                'num_addon_services', 'latitude', 'zip_code', 'avg_monthly_long_distance_charges', 'longitude'
-            ]
-            categorical_columns = ['tenure_category', 'contract', 'paperless_billing', 'city']
+            numerical_columns = ['monthly_charge', 'longitude', 'latitude', 'zip_code', 'number_of_referrals', 'age', 
+                                 'tenure_in_months', 'total_long_distance_charges', 'total_revenue', 'avg_monthly_long_distance_charges', 
+                                 'total_charges', 'avg_monthly_gb_download', 'number_of_dependents', 'engagement_score', 'num_addon_services', 
+                                 'total_extra_data_charges', 'total_refunds']
+            categorical_columns = ['city', 'contract', 'payment_method', 'offer', 'paperless_billing', 'multiple_lines']
 
             num_pipeline= Pipeline(
                 steps=[
