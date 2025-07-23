@@ -11,4 +11,5 @@ lightgbm
 dill
 nbformat
 plotly
+dvc
 -e .
