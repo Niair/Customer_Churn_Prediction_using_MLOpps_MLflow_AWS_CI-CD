@@ -1,0 +1,14 @@
+artifact_uri: mlflow-artifacts:/951202080101722042/c6892ecf251442448bae0e375536c156/artifacts
+end_time: 1753627521298
+entry_point_name: ''
+experiment_id: '951202080101722042'
+lifecycle_stage: active
+run_id: c6892ecf251442448bae0e375536c156
+run_name: XGBoost
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1753627519020
+status: 3
+tags: []
+user_id: Nihal
