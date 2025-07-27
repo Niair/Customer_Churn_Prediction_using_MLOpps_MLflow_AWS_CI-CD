@@ -14,4 +14,5 @@ plotly
 dvc
 streamlit
 shap
+mlflow
 -e .
