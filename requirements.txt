@@ -15,4 +15,6 @@ dvc
 streamlit
 shap
 mlflow
+dagshub
+pytest
 -e .
