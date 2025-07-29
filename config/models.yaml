@@ -1,61 +1,28 @@
-models:
-  RandomForest:
-    class: "sklearn.ensemble.RandomForestClassifier"
-    params:
-      n_estimators: [100, 300]
-      max_depth: [3, 15]
-      min_samples_split: [2, 10]
-      min_samples_leaf: [1, 10]
-      n_jobs: -1
-      random_state: 42
-  
-  CatBoost:
-    class: "catboost.CatBoostClassifier"
-    params:
-      iterations: [100, 500]
-      depth: [4, 10]
-      learning_rate: [0.01, 0.3, 'log']
-      l2_leaf_reg: [1e-3, 10.0, 'log']
-      verbose: 0
-      random_state: 42
-  
-  XGBoost:
-    class: "xgboost.XGBClassifier"
-    params:
-      n_estimators: [100, 500]
-      learning_rate: [0.01, 0.3, 'log']
-      max_depth: [3, 10]
-      subsample: [0.6, 1.0]
-      colsample_bytree: [0.6, 1.0]
-      n_jobs: -1
-      random_state: 42
-      use_label_encoder: False
-      eval_metric: "logloss"
-  
-  SVC:
-    class: "sklearn.svm.SVC"
-    params:
-      C: [1e-2, 100, 'log']
-      kernel: ["linear", "rbf", "poly", "sigmoid"]
-      degree: [2, 5]
-      probability: True
-      random_state: 42
-  
-  LogisticRegression:
-    class: "sklearn.linear_model.LogisticRegression"
-    params:
-      C: [0.01, 10.0]
-      penalty: ["l1", "l2"]
-      solver: ["liblinear"]
-      max_iter: 1000
-      random_state: 42
-  
-  LightGBM:
-    class: "lightgbm.LGBMClassifier"
-    params:
-      n_estimators: [100, 500]
-      learning_rate: [0.01, 0.3, 'log']
-      num_leaves: [31, 255]
-      max_depth: [3, 10]
-      n_jobs: -1
-      random_state: 42
+RandomForestClassifier:
+  class: sklearn.ensemble.RandomForestClassifier
+  params:
+    n_estimators: [100, 200]
+    max_depth: [5, 10]
+    min_samples_split: [2, 5]
+
+XGBClassifier:
+  class: xgboost.XGBClassifier
+  params:
+    n_estimators: [100, 200]
+    max_depth: [3, 6]
+    learning_rate: [0.01, 0.1]
+
+CatBoostClassifier:
+  class: catboost.CatBoostClassifier
+  params:
+    iterations: [100, 200]
+    learning_rate: [0.03, 0.1]
+    depth: [4, 6]
+    verbose: 0
+
+GradientBoostingClassifier:
+  class: sklearn.ensemble.GradientBoostingClassifier
+  params:
+    n_estimators: [100, 150]
+    learning_rate: [0.05, 0.1]
+    max_depth: [3, 5]
