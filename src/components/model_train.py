@@ -2,6 +2,7 @@ import os
 import sys
 from dataclasses import dataclass
 import time
+
 import numpy as np
 import optuna
 from optuna.pruners import MedianPruner
@@ -13,7 +14,7 @@ from catboost import CatBoostClassifier
 from lightgbm import LGBMClassifier
 from sklearn.svm import SVC
 from sklearn.metrics import (
-    roc_auc_score, accuracy_score, precision_score, 
+    roc_auc_score, accuracy_score, precision_score,
     recall_score, f1_score
 )
 from sklearn.model_selection import StratifiedKFold
@@ -29,7 +30,7 @@ import dagshub
 dagshub.init(repo_owner='Niair', repo_name='Customer_Churn_Prediction_using_MLOpps_MLflow_AWS_CI-CD', mlflow=True)
 mlflow.set_tracking_uri("https://dagshub.com/Niair/Customer_Churn_Prediction_using_MLOpps_MLflow_AWS_CI-CD.mlflow")
 
-mlflow.set_experiment("exp_1")
+mlflow.set_experiment("exp")
 
 @dataclass
 class ModelTrainingConfig:
@@ -119,7 +120,8 @@ class ModelTrainer:
         if y_probs is not None:
             try:
                 metrics["roc_auc"] = roc_auc_score(y_true, y_probs)
-            except:
+            except ValueError as e: # Catch specific ValueError for roc_auc_score
+                logging.warning(f"Could not calculate ROC AUC: {e}. Setting to 0.0.")
                 metrics["roc_auc"] = 0.0
         return metrics
 
@@ -187,7 +189,11 @@ class ModelTrainer:
 
         except Exception as e:
             logging.error(f"Error in objective function for {model_name}: {str(e)}")
+            # Explicitly set the MLflow run status to FAILED
+            if mlflow.active_run():
+                mlflow.set_terminated(status='FAILED')
             raise CustomException(e, sys)
+
 
     def optimize_model(self, model_name, X_train, y_train):
         try:
@@ -197,11 +203,18 @@ class ModelTrainer:
                 pruner=MedianPruner()
             )
 
-            study.optimize(lambda trial: self.objective(trial, model_name, X_train, y_train), n_trials=20, n_jobs=1)
+            # Pass the current run ID to Optuna for better tracking if needed, though not strictly necessary for the cross mark issue
+            with mlflow.start_run(run_name=f"{model_name}_optimization_study", nested=True) as run:
+                mlflow.set_tag("parent_run_id", mlflow.active_run().info.run_id) # Log parent run ID
+                study.optimize(lambda trial: self.objective(trial, model_name, X_train, y_train), n_trials=20, n_jobs=1)
+
             return study.best_params, study.best_value
 
         except Exception as e:
             logging.error(f"Optimization failed for {model_name}: {str(e)}")
+            # Explicitly set the MLflow run status to FAILED for the optimization run
+            if mlflow.active_run():
+                mlflow.set_terminated(status='FAILED')
             raise CustomException(e, sys)
 
     def initiate_model_trainer(self, train_array, test_array):
@@ -215,12 +228,13 @@ class ModelTrainer:
             best_model_name = ""
             best_params_all = {}
 
-            with mlflow.start_run(run_name="classifier_comparison"):
+            with mlflow.start_run(run_name="classifier_comparison") as main_run:
                 mlflow.set_tags({"author": "nihal", "project": "customer-churn", "task": "classification"})
 
                 for model_name in self.models_config:
-                    try:
-                        with mlflow.start_run(run_name=f"{model_name}_optimization", nested=True):
+                    # Start a nested run for each model's full process (optimization + evaluation)
+                    with mlflow.start_run(run_name=f"{model_name}_full_process", nested=True) as model_run:
+                        try:
                             logging.info(f"Optimizing {model_name} with Optuna")
                             best_params, best_cv_score = self.optimize_model(model_name, X_train, y_train)
 
@@ -240,7 +254,6 @@ class ModelTrainer:
                             mlflow.sklearn.log_model(
                                 sk_model=model,
                                 artifact_path=f"{model_name}_model",
-                                registered_model_name=f"churn_{model_name}",
                                 signature=signature,
                                 input_example=X_test[:1],
                                 metadata={"cv_score": best_cv_score, "model_type": model_name}
@@ -253,11 +266,20 @@ class ModelTrainer:
                                 best_metrics = metrics
                                 best_params_all = best_params
 
-                    except Exception as e:
-                        logging.error(f"Failed to optimize {model_name}: {str(e)}")
-                        continue
+                        except Exception as e:
+                            logging.error(f"Failed to optimize or train {model_name}: {str(e)}")
+                            # Set the status of the current nested model_run to FAILED
+                            if mlflow.active_run():
+                                mlflow.set_terminated(status='FAILED')
+                            # Don't re-raise immediately; allow other models to run if possible
+                            # However, this means `classifier_comparison` might still succeed even if a nested run fails.
+                            # If you want `classifier_comparison` to fail if any nested model fails, re-raise here.
+                            # For now, we'll let it continue but log the failure.
+                            continue # Continue to the next model even if this one failed
 
                 if best_model is None:
+                    logging.error("No suitable model found after testing all classifiers. Marking main run as FAILED.")
+                    mlflow.set_terminated(status='FAILED')
                     raise CustomException("No suitable model found after testing all classifiers", sys)
 
                 save_object(self.model_trainer_config.trained_model_file_path, best_model)
@@ -269,7 +291,6 @@ class ModelTrainer:
                     mlflow.sklearn.log_model(
                         sk_model=best_model,
                         artifact_path="production_model",
-                        registered_model_name="churn_production_model",
                         signature=infer_signature(X_test, y_pred),
                         input_example=X_test[:1],
                         metadata=best_metrics
@@ -282,9 +303,12 @@ class ModelTrainer:
                 "metrics": best_metrics,
                 "params": best_params_all,
                 "model_path": self.model_trainer_config.trained_model_file_path,
-                "mlflow_run_id": mlflow.active_run().info.run_id
+                "mlflow_run_id": main_run.info.run_id # Get the ID of the main run
             }
 
         except Exception as e:
             logging.error(f"Model training failed: {str(e)}")
+            # Set the status of the overall main run to FAILED
+            if mlflow.active_run():
+                mlflow.set_terminated(status='FAILED')
             raise CustomException(e, sys)
