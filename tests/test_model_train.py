@@ -2,19 +2,16 @@ import os
 import numpy as np
 from src.components.model_train import ModelTrainer
 
-def test_model_trainer_runs_with_mock_data(tmp_path):
-    np.random.seed(42)
-    X = np.random.rand(30, 10)
-    y = np.random.randint(0, 2, size=(30,))
-    
-    train_array = np.c_[X, y]
-    test_array = np.c_[X, y]
+def test_model_trainer_runs_on_sample_data(tmp_path):
+    # Create dummy train/test array: 5 samples, 3 features + 1 label
+    X_dummy = np.random.rand(5, 3)
+    y_dummy = np.array([0, 1, 0, 1, 0]).reshape(-1, 1)
+    train_arr = np.hstack((X_dummy, y_dummy))
+    test_arr = np.hstack((X_dummy, y_dummy))
 
     trainer = ModelTrainer()
-    result = trainer.initiate_model_trainer(train_array, test_array)
+    auc_score = trainer.initiate_model_trainer(train_arr, test_arr)
 
-    assert isinstance(result, dict)
-    assert "best_model" in result
-    assert "metrics" in result
-    assert "model_path" in result
-    assert os.path.exists(result["model_path"])
+    assert isinstance(auc_score, float)
+    assert 0.0 <= auc_score <= 1.0
+    assert os.path.exists(trainer.model_trainer_config.trained_model_file_path)
