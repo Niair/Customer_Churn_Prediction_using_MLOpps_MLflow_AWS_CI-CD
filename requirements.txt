@@ -17,4 +17,5 @@ shap
 mlflow
 dagshub
 pytest
+optuna-integration[mlflow]
 -e .
