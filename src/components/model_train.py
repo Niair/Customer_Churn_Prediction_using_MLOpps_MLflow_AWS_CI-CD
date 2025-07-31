@@ -32,7 +32,7 @@ from src.utils import save_object, load_object
 
 dagshub.init(repo_owner='Niair', repo_name='Customer_Churn_Prediction_using_MLOpps_MLflow_AWS_CI-CD', mlflow=True)
 mlflow.set_tracking_uri("https://dagshub.com/Niair/Customer_Churn_Prediction_using_MLOpps_MLflow_AWS_CI-CD.mlflow")
-mlflow.set_experiment("churn_model_optimization3")
+mlflow.set_experiment("try2")
 
 @dataclass
 class ModelTrainingConfig:
