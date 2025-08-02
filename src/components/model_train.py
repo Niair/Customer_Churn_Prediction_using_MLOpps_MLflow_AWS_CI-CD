@@ -1,11 +1,9 @@
 import os
 import sys
 from dataclasses import dataclass
-
 import mlflow
 import dagshub
 import optuna
-
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
@@ -21,18 +19,17 @@ from sklearn.metrics import (
 from sklearn.model_selection import StratifiedKFold, cross_validate
 from sklearn.pipeline import Pipeline
 from imblearn.over_sampling import SMOTE
-
 from src.exception import CustomException
 from src.logger import logging
 from src.utils import save_object
 
+# Initialize MLflow tracking
 dagshub.init(
     repo_owner='Niair',
     repo_name='Customer_Churn_Prediction_using_MLOpps_MLflow_AWS_CI-CD',
     mlflow=True
 )
 mlflow.set_tracking_uri("https://dagshub.com/Niair/Customer_Churn_Prediction_using_MLOpps_MLflow_AWS_CI-CD.mlflow")
-mlflow.set_experiment("t2")
 
 @dataclass
 class ModelTrainingConfig:
@@ -41,6 +38,8 @@ class ModelTrainingConfig:
 class ModelTrainer:
     def __init__(self):
         self.model_trainer_config = ModelTrainingConfig()
+        self.best_models = {}  # Stores best model from each category
+        self.global_best = None  # Will store the absolute best model
 
     def _get_model_from_name(self, model_name, trial=None):
         if trial is None:
@@ -115,7 +114,8 @@ class ModelTrainer:
         else:
             raise ValueError("Unsupported model")
 
-    def optimize_model(self, model_name, X_train, y_train, X_test, y_test):
+    def _run_algorithm_experiment(self, model_name, X_train, y_train, X_test, y_test):
+        """Runs complete experiment for one algorithm"""
         if not isinstance(X_train, pd.DataFrame):
             X_train_df = pd.DataFrame(X_train)
             X_test_df = pd.DataFrame(X_test)
@@ -123,14 +123,10 @@ class ModelTrainer:
             X_train_df = X_train
             X_test_df = X_test
 
-        def _roc_auc_proba_scorer(y_true, y_proba):
-            if y_proba.ndim == 2 and y_proba.shape[1] == 2:
-                return roc_auc_score(y_true, y_proba[:, 1])
-            else:
-                return roc_auc_score(y_true, y_proba)
-
+        # Scoring metrics
         scoring = {
-            'roc_auc': make_scorer(_roc_auc_proba_scorer, needs_proba=True),
+            'roc_auc': make_scorer(roc_auc_score, needs_proba=True),
+            'accuracy': make_scorer(accuracy_score),
             'precision': make_scorer(precision_score, zero_division=0),
             'recall': make_scorer(recall_score, zero_division=0),
             'f1': make_scorer(f1_score, zero_division=0)
@@ -138,154 +134,147 @@ class ModelTrainer:
 
         cv_strategy = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
 
-        def objective(trial):
-            with mlflow.start_run(run_name=f"{model_name}_Trial_{trial.number}", nested=True):
-                mlflow.set_tag("model_name", model_name)
-                mlflow.set_tag("trial_id", trial.number)
+        # Storage for this algorithm's results
+        algorithm_results = {
+            "best_model": None,
+            "best_auc": -1,
+            "best_accuracy": -1,
+            "best_params": {},
+            "best_metrics": {},
+            "trials": []
+        }
 
+        def objective(trial):
+            with mlflow.start_run(nested=True):
+                # Model setup
                 model = self._get_model_from_name(model_name, trial)
                 pipeline = Pipeline([
                     ('smote', SMOTE(random_state=42)),
                     ('model', model)
                 ])
 
-                try:
-                    cv_results = cross_validate(
-                        pipeline, X_train_df, y_train,
-                        cv=cv_strategy, scoring=scoring,
-                        return_train_score=False, n_jobs=-1
-                    )
+                # Cross-validation
+                cv_results = cross_validate(
+                    pipeline, X_train_df, y_train,
+                    cv=cv_strategy, scoring=scoring,
+                    return_train_score=False, n_jobs=-1
+                )
 
-                    metrics_to_log = {
-                        "AUC": np.mean(cv_results['test_roc_auc']),
-                        "Precision": np.mean(cv_results['test_precision']),
-                        "Recall": np.mean(cv_results['test_recall']),
-                        "F1-Score": np.mean(cv_results['test_f1'])
-                    }
+                # Calculate mean metrics
+                metrics = {
+                    "auc": np.mean(cv_results['test_roc_auc']),
+                    "accuracy": np.mean(cv_results['test_accuracy']),
+                    "precision": np.mean(cv_results['test_precision']),
+                    "recall": np.mean(cv_results['test_recall']),
+                    "f1": np.mean(cv_results['test_f1'])
+                }
 
-                    for key in metrics_to_log:
-                        if np.isnan(metrics_to_log[key]) or np.isinf(metrics_to_log[key]):
-                            logging.warning(f"{model_name} Trial {trial.number} - {key} is NaN/Inf, setting to 0.")
-                            metrics_to_log[key] = 0.0
+                # Store trial results
+                trial_data = {
+                    "params": trial.params,
+                    "cv_metrics": metrics,
+                    "test_metrics": None  # Will be filled for best trial
+                }
+                algorithm_results["trials"].append(trial_data)
 
-                    prefixed_params = {f"{model_name}_{k}": v for k, v in trial.params.items()}
-                    mlflow.log_params(prefixed_params)
+                # Log to MLflow
+                mlflow.log_params(trial.params)
+                mlflow.log_metrics({f"cv_{k}": v for k, v in metrics.items()})
 
-                    mlflow.log_metrics({f"{model_name}_CV_{k}": v for k, v in metrics_to_log.items()})
+                return metrics["auc"]
 
-                    # Prune poor trials
-                    if metrics_to_log["AUC"] == 0.0:
-                        raise optuna.exceptions.TrialPruned()
-
-                    return metrics_to_log["AUC"]
-
-                except Exception as e:
-                    logging.error(f"{model_name} Trial {trial.number} failed: {e}")
-                    mlflow.set_tag("trial_status", "failed")
-                    return -1.0
-
+        # Run optimization
         study = optuna.create_study(direction="maximize")
         study.optimize(objective, n_trials=5)
 
+        # Train best model on full data
         best_model = self._get_model_from_name(model_name, trial=optuna.trial.FixedTrial(study.best_params))
         X_train_resampled, y_train_resampled = SMOTE(random_state=42).fit_resample(X_train_df, y_train)
         best_model.fit(X_train_resampled, y_train_resampled)
 
+        # Evaluate on test set
         y_pred_proba = best_model.predict_proba(X_test_df)[:, 1]
         y_pred = best_model.predict(X_test_df)
 
-        return (
-            roc_auc_score(y_test, y_pred_proba),
-            best_model,
-            study.best_params,
-            {
-                "test_accuracy": accuracy_score(y_test, y_pred),
-                "test_precision": precision_score(y_test, y_pred, zero_division=0),
-                "test_recall": recall_score(y_test, y_pred, zero_division=0),
-                "test_f1": f1_score(y_test, y_pred, zero_division=0)
-            }
-        )
+        test_metrics = {
+            "auc": roc_auc_score(y_test, y_pred_proba),
+            "accuracy": accuracy_score(y_test, y_pred),
+            "precision": precision_score(y_test, y_pred, zero_division=0),
+            "recall": recall_score(y_test, y_pred, zero_division=0),
+            "f1": f1_score(y_test, y_pred, zero_division=0)
+        }
+
+        # Update algorithm results
+        algorithm_results.update({
+            "best_model": best_model,
+            "best_auc": test_metrics["auc"],
+            "best_accuracy": test_metrics["accuracy"],
+            "best_params": study.best_params,
+            "best_metrics": test_metrics
+        })
+
+        # Update test metrics for best trial
+        for trial in algorithm_results["trials"]:
+            if trial["params"] == study.best_params:
+                trial["test_metrics"] = test_metrics
+                break
+
+        # Log final algorithm results
+        mlflow.log_metrics({f"best_{k}": v for k, v in test_metrics.items()})
+        mlflow.log_params({f"best_{k}": v for k, v in study.best_params.items()})
+        
+        return algorithm_results
 
     def initiate_model_trainer(self, train_arr, test_arr):
         try:
             X_train, y_train = train_arr[:, :-1], train_arr[:, -1]
             X_test, y_test = test_arr[:, :-1], test_arr[:, -1]
 
-            global_best_score = -1.0
-            global_best_model = None
-            global_best_model_name = None
-            global_best_params = {}
-            global_best_metrics = {}
+            model_names = ["Random Forest", "Logistic Regression", "XGBoost", "LightGBM", "CatBoost", "SVM"]
 
-            model_names = ["Random Forest", "XGBoost", "LightGBM", "CatBoost", "SVM", "Logistic Regression"]
+            # Run each algorithm in its own experiment
+            for model_name in model_names:
+                with mlflow.start_run(run_name=f"{model_name} Experiment", nested=True):
+                    mlflow.set_tag("algorithm", model_name)
+                    results = self._run_algorithm_experiment(model_name, X_train, y_train, X_test, y_test)
+                    self.best_models[model_name] = results
 
-            with mlflow.start_run(run_name="Best_Model_Run"):
-                for model_name in model_names:
-                    best_score = -1.0
-                    best_model = None
-                    best_params = {}
-                    best_metrics = {}
+                    # Save model artifact
+                    model_path = os.path.join("artifacts", f"{model_name.replace(' ', '_')}_model.pkl")
+                    save_object(model_path, results["best_model"])
+                    mlflow.log_artifact(model_path)
 
-                    with mlflow.start_run(run_name=model_name, nested=True):
-                        mlflow.set_tag("model_name", model_name)
-
-                        try:
-                            test_auc, model, params, metrics = self.optimize_model(
-                                model_name, X_train, y_train, X_test, y_test
-                            )
-
-                            # ✅ Log test scores for the best trial of the model
-                            mlflow.log_metrics({
-                                f"Best_{model_name.replace(' ', '_')}_AUC": test_auc,
-                                f"Best_{model_name.replace(' ', '_')}_Accuracy": metrics["test_accuracy"],
-                                f"Best_{model_name.replace(' ', '_')}_Precision": metrics["test_precision"],
-                                f"Best_{model_name.replace(' ', '_')}_Recall": metrics["test_recall"],
-                                f"Best_{model_name.replace(' ', '_')}_F1": metrics["test_f1"],
-                            })
-
-                            # ✅ Save and log the best model artifact of this type
-                            model_path = os.path.join("temp_models", f"{model_name.replace(' ', '_')}_model.pkl")
-                            os.makedirs(os.path.dirname(model_path), exist_ok=True)
-                            save_object(model_path, model)
-                            mlflow.log_artifact(model_path, artifact_path="model_artifacts")
-                            os.remove(model_path)
-
-                            best_model = model
-                            best_score = test_auc
-                            best_params = params
-                            best_metrics = metrics
-
-                            if test_auc > global_best_score:
-                                global_best_model = model
-                                global_best_score = test_auc
-                                global_best_model_name = model_name
-                                global_best_params = params
-                                global_best_metrics = metrics
-
-                        except Exception as e:
-                            logging.error(f"{model_name} failed: {e}")
-                            mlflow.log_param(f"{model_name}_status", "Failed")
-                            mlflow.log_metric(f"{model_name}_AUC", -1.0)
-
-                # ✅ Log final global best model after all types
-                if global_best_model is None:
-                    raise CustomException("All model optimizations failed", sys)
-
-                save_object(self.model_trainer_config.trained_model_file_path, global_best_model)
-
-                mlflow.set_tag("final_model", global_best_model_name)
-                mlflow.log_param("Overall_Best_Model", global_best_model_name)
+            # Compare all algorithms to find global best
+            with mlflow.start_run(run_name="Best Models Comparison"):
+                global_best_auc = -1
+                global_best_model = None
+                global_best_name = ""
+                
+                # Log each algorithm's best performance
+                for model_name, results in self.best_models.items():
+                    mlflow.log_metrics({
+                        f"{model_name}_best_auc": results["best_auc"],
+                        f"{model_name}_best_accuracy": results["best_accuracy"]
+                    })
+                    
+                    # Check if this is the new global best
+                    if results["best_auc"] > global_best_auc:
+                        global_best_auc = results["best_auc"]
+                        global_best_model = results["best_model"]
+                        global_best_name = model_name
+                
+                # Log global best
+                mlflow.set_tag("global_best_model", global_best_name)
                 mlflow.log_metrics({
-                    "Overall_Best_AUC": global_best_score,
-                    "Overall_Best_Accuracy": global_best_metrics.get("test_accuracy", 0.0),
-                    "Overall_Best_Precision": global_best_metrics.get("test_precision", 0.0),
-                    "Overall_Best_Recall": global_best_metrics.get("test_recall", 0.0),
-                    "Overall_Best_F1": global_best_metrics.get("test_f1", 0.0)
+                    "global_best_auc": global_best_auc,
+                    "global_best_accuracy": self.best_models[global_best_name]["best_accuracy"]
                 })
-                mlflow.log_artifact(self.model_trainer_config.trained_model_file_path, artifact_path="final_best_model")
+                
+                # Save global best model
+                save_object(self.model_trainer_config.trained_model_file_path, global_best_model)
+                mlflow.log_artifact(self.model_trainer_config.trained_model_file_path)
 
-            logging.info(f"Best overall model: {global_best_model_name} with AUC: {global_best_score}")
-            return global_best_score
+            return global_best_auc
 
         except Exception as e:
             raise CustomException(e, sys)
