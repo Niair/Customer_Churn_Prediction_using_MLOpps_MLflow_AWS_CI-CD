@@ -12,7 +12,7 @@ class PredictPipeline:
     def predict(self, features):
         try:
             model_path = os.path.join("artifacts", "model.pkl")
-            preprocessor_path = os.path.join("artifacts", "proprocessor.pkl")
+            preprocessor_path = os.path.join("artifacts", "preprocessor.pkl")
 
             model = load_object(file_path=model_path)
             preprocessor = load_object(file_path=preprocessor_path)
@@ -30,79 +30,79 @@ class CustomData:
     def __init__(
         self,
         monthly_charge: float,
-        city: str,
-        longitude: float,
-        latitude: float,
         zip_code: int,
-        number_of_referrals: int,
+        longitude: float,
         age: int,
-        tenure_in_months: int,
+        latitude: float,
         total_long_distance_charges: float,
+        tenure_in_months: int,
         total_revenue: float,
-        avg_monthly_long_distance_charges: float,
+        number_of_referrals: int,
         total_charges: float,
+        avg_monthly_long_distance_charges: float,
         avg_monthly_gb_download: float,
-        contract: str,
         number_of_dependents: int,
-        payment_method: str,
         engagement_score: float,
         num_addon_services: int,
+        city: str,
+        contract: str,
+        payment_method: str,
         offer: str,
-        total_extra_data_charges: float,
         paperless_billing: str,
-        total_refunds: float,
-        multiple_lines: str,
+        gender: str,
+        married: str,
+        internet_type: str,
     ):
         self.monthly_charge = monthly_charge
-        self.city = city
-        self.longitude = longitude
-        self.latitude = latitude
         self.zip_code = zip_code
-        self.number_of_referrals = number_of_referrals
+        self.longitude = longitude
         self.age = age
-        self.tenure_in_months = tenure_in_months
+        self.latitude = latitude
         self.total_long_distance_charges = total_long_distance_charges
+        self.tenure_in_months = tenure_in_months
         self.total_revenue = total_revenue
-        self.avg_monthly_long_distance_charges = avg_monthly_long_distance_charges
+        self.number_of_referrals = number_of_referrals
         self.total_charges = total_charges
+        self.avg_monthly_long_distance_charges = avg_monthly_long_distance_charges
         self.avg_monthly_gb_download = avg_monthly_gb_download
-        self.contract = contract
         self.number_of_dependents = number_of_dependents
-        self.payment_method = payment_method
         self.engagement_score = engagement_score
         self.num_addon_services = num_addon_services
+        self.city = city
+        self.contract = contract
+        self.payment_method = payment_method
         self.offer = offer
-        self.total_extra_data_charges = total_extra_data_charges
         self.paperless_billing = paperless_billing
-        self.total_refunds = total_refunds
-        self.multiple_lines = multiple_lines
+        self.gender = gender
+        self.married = married
+        self.internet_type = internet_type
 
     def get_data_as_data_frame(self):
         try:
             custom_data_input_dict = {
                 "monthly_charge": [self.monthly_charge],
-                "city": [self.city],
-                "longitude": [self.longitude],
-                "latitude": [self.latitude],
                 "zip_code": [self.zip_code],
-                "number_of_referrals": [self.number_of_referrals],
+                "longitude": [self.longitude],
                 "age": [self.age],
-                "tenure_in_months": [self.tenure_in_months],
+                "latitude": [self.latitude],
                 "total_long_distance_charges": [self.total_long_distance_charges],
+                "tenure_in_months": [self.tenure_in_months],
                 "total_revenue": [self.total_revenue],
-                "avg_monthly_long_distance_charges": [self.avg_monthly_long_distance_charges],
+                "number_of_referrals": [self.number_of_referrals],
                 "total_charges": [self.total_charges],
+                "avg_monthly_long_distance_charges": [self.avg_monthly_long_distance_charges],
                 "avg_monthly_gb_download": [self.avg_monthly_gb_download],
-                "contract": [self.contract],
                 "number_of_dependents": [self.number_of_dependents],
-                "payment_method": [self.payment_method],
                 "engagement_score": [self.engagement_score],
                 "num_addon_services": [self.num_addon_services],
+                "city": [self.city],
+                "contract": [self.contract],
+                "payment_method": [self.payment_method],
                 "offer": [self.offer],
-                "total_extra_data_charges": [self.total_extra_data_charges],
                 "paperless_billing": [self.paperless_billing],
-                "total_refunds": [self.total_refunds],
-                "multiple_lines": [self.multiple_lines],
+                "gender": [self.gender],
+                "married": [self.married],
+                "internet_type": [self.internet_type],
             }
 
             return pd.DataFrame(custom_data_input_dict)

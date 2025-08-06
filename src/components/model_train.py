@@ -38,7 +38,6 @@ from src.utils import save_object, load_object
 
 dagshub.init(repo_owner='Niair', repo_name='Customer_Churn_Prediction_using_MLOpps_MLflow_AWS_CI-CD', mlflow=True)
 mlflow.set_tracking_uri("https://dagshub.com/Niair/Customer_Churn_Prediction_using_MLOpps_MLflow_AWS_CI-CD.mlflow")
-mlflow.set_experiment("ex2")
 
 @dataclass
 class ModelTrainerConfig:
@@ -123,7 +122,8 @@ class ModelTrainer:
         else:
             raise ValueError("Unsupported model")
 
-    def optimize_model(self, model_name, X_train, y_train, X_test, y_test):
+    def optimize_model(self, model_name, X_train, y_train, X_test, y_test, n_trials=30, experiment_name="churn_prediction_experiments"):
+        mlflow.set_experiment(experiment_name)
         if not isinstance(X_train, pd.DataFrame):
             X_train_df = pd.DataFrame(X_train)
             X_test_df = pd.DataFrame(X_test)
@@ -135,9 +135,12 @@ class ModelTrainer:
         n_neg = np.sum(y_train == 0)
         scale_pos_weight = n_neg / n_pos if n_pos > 0 else 1.0
 
+        if n_pos < 2:
+            logging.error(f"Insufficient positive samples ({n_pos}) for {model_name}")
+            return 0.0, None, {}, {}
+
         def _roc_auc_proba_scorer(y_true, y_proba):
             try:
-                # Handle binary and multi-class cases
                 if y_proba.ndim == 1:
                     return roc_auc_score(y_true, y_proba)
                 elif y_proba.shape[1] == 2:
@@ -155,7 +158,7 @@ class ModelTrainer:
             'recall': make_scorer(recall_score, zero_division=0),
             'f1': make_scorer(f1_score, zero_division=0)
         }
-        cv_strategy = StratifiedKFold(n_splits=2, shuffle=True, random_state=42)
+        cv_strategy = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
         def objective(trial):
             with mlflow.start_run(run_name=f"Trial_{trial.number}", nested=True):
@@ -211,7 +214,7 @@ class ModelTrainer:
 
         study = optuna.create_study(direction="maximize")
         try:
-            study.optimize(objective, n_trials=3, n_jobs=1)
+            study.optimize(objective, n_trials=n_trials, n_jobs=1)
         except Exception as e:
             logging.error(f"Optuna study failed: {e}")
             raise e
@@ -253,7 +256,7 @@ class ModelTrainer:
             "test_f1": test_f1
         }
 
-    def initiate_model_trainer(self, train_arr, test_arr):
+    def initiate_model_trainer(self, train_arr, test_arr, n_trials=30, experiment_name="churn_prediction_experiments"):
         try:
             logging.info("Splitting training and test arrays")
             X_train, y_train = train_arr[:, :-1], train_arr[:, -1]
@@ -269,10 +272,11 @@ class ModelTrainer:
             
             with mlflow.start_run(run_name="Best_Model_Run") as parent_run:
                 for model_name in model_names:
-                    with mlflow.start_run(run_name=model_name, nested=True):
+                    with mlflow.start_run(nested=True):
+                        mlflow.set_tag("model_name", model_name)
                         try:
                             test_auc, model, best_params, additional_metrics = self.optimize_model(
-                                model_name, X_train, y_train, X_test, y_test
+                                            model_name, X_train, y_train, X_test, y_test, n_trials=n_trials, experiment_name=experiment_name
                             )
                             
                             mlflow.log_params(best_params)
