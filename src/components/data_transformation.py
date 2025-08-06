@@ -1,133 +1,96 @@
-import sys
-from dataclasses import dataclass
-
-import numpy as np 
+import streamlit as st
 import pandas as pd
-from sklearn.compose import ColumnTransformer
-from sklearn.impute import SimpleImputer
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder, StandardScaler
-from sklearn.preprocessing import LabelEncoder
-from category_encoders import TargetEncoder
+from src.pipeline.predict_pipeline import CustomData, PredictPipeline
 
-from src.exception import CustomException
-from src.logger import logging
-import os
+# Streamlit page setup
+st.set_page_config(page_title="Customer Churn Predictor", page_icon="📉", layout="centered")
 
-from src.utils import save_object
+st.title("📉 Customer Churn Prediction App")
+st.markdown("Predict whether a customer is likely to churn based on their telecom usage and demographic data.")
 
-@dataclass
-class DataTransformationConfig:
-    preprocessor_obj_file_path=os.path.join('artifacts',"preprocessor.pkl")
+with st.form("churn_form"):
+    st.subheader("Enter Customer Details")
 
-class DataTransformation:
-    def __init__(self):
-        self.data_transformation_config=DataTransformationConfig()
-
-    def get_data_transformer_object(self):
-        '''
-        This function si responsible for data trnasformation
+    # Personal/Demographic Information
+    col1, col2 = st.columns(2)
+    with col1:
+        age = st.slider("Age", 18, 90, 35)
+        gender = st.selectbox("Gender", ["Male", "Female", "Other"])
+        married = st.selectbox("Married", ["Yes", "No"])
+        number_of_dependents = st.slider("Number of Dependents", 0, 5, 1)
         
-        '''
-        try:
-            numerical_columns = ['monthly_charge', 'zip_code', 'longitude', 'age', 'latitude',
-                                 'total_long_distance_charges', 'tenure_in_months', 'total_revenue', 'number_of_referrals',
-                                 'total_charges', 'avg_monthly_long_distance_charges', 'avg_monthly_gb_download', 'number_of_dependents',
-                                 'engagement_score', 'num_addon_services']
-            categorical_columns = ['city', 'contract', 'payment_method', 'offer', 'paperless_billing', 'gender', 'married', 'internet_type']
-
-            num_pipeline= Pipeline(
-                steps=[
-                ("imputer",SimpleImputer(strategy="median")),
-                ("scaler",StandardScaler())
-
-                ]
-            )
-            # diff = ColumnTransformer(
-            #     [
-            #         ("tenure_category",OrdinalEncoder(), 'tenure_category'),
-            #         ("contract",OneHotEncoder(), 'contract'),
-            #         ("paperless_billing", LabelEncoder(),'paperless_billing'),
-            #         ("city", TargetEncoder(),'city')
-            #     ]
-            # )
-            cat_pipeline=Pipeline(
-
-                steps=[
-                ("imputer",SimpleImputer(strategy="most_frequent")),
-                ("one_hot_encoder",OneHotEncoder(handle_unknown='ignore',sparse_output=False,drop='first'))
-                ]
-
-            )
-
-            logging.info(f"Categorical columns: {categorical_columns}")
-            logging.info(f"Numerical columns: {numerical_columns}")
-
-            preprocessor=ColumnTransformer(
-                [
-                ("num_pipeline",num_pipeline,numerical_columns),
-                ("cat_pipelines",cat_pipeline,categorical_columns)
-
-                ]
-
-
-            )
-
-            return preprocessor
+    # Location Information
+    with col2:
+        city = st.selectbox("City", ["Los Angeles", "New York", "San Francisco", "Chicago", "Houston"])
+        zip_code = st.number_input("Zip Code", min_value=10000, max_value=99999, value=90001)
+        longitude = st.number_input("Longitude", value=-118.24)
+        latitude = st.number_input("Latitude", value=34.05)
+    
+    # Account Information
+    st.subheader("Account & Usage Details")
+    col1, col2 = st.columns(2)
+    with col1:
+        tenure_in_months = st.slider("Tenure in Months", 1, 100, 24)
+        contract = st.selectbox("Contract Type", ["Month-to-Month", "One Year", "Two Year"])
+        paperless_billing = st.selectbox("Paperless Billing", ["Yes", "No"])
+        payment_method = st.selectbox("Payment Method", ["Credit Card", "Bank Transfer", "Electronic Check", "Mailed Check"])
+        offer = st.selectbox("Current Offer", ["None", "Offer A", "Offer B", "Offer C"])
         
-        except Exception as e:
-            raise CustomException(e,sys)
+    with col2:
+        monthly_charge = st.number_input("Monthly Charge", min_value=0.0, value=50.0)
+        total_charges = st.number_input("Total Charges", value=600.0)
+        total_revenue = st.number_input("Total Revenue", value=500.0)
+        number_of_referrals = st.slider("Number of Referrals", 0, 10, 2)
+        engagement_score = st.slider("Engagement Score", 0.0, 10.0, 5.0)
         
-    def initiate_data_transformation(self,train_path,test_path):
+    # Internet & Services
+    st.subheader("Internet & Additional Services")
+    col1, col2 = st.columns(2)
+    with col1:
+        internet_type = st.selectbox("Internet Type", ["Cable", "DSL", "Fiber Optic", "None"])
+        avg_monthly_gb_download = st.number_input("Avg Monthly GB Download", value=20.0)
+        num_addon_services = st.slider("Number of Add-on Services", 0, 10, 2)
+        
+    with col2:
+        total_long_distance_charges = st.number_input("Total Long Distance Charges", value=30.0)
+        avg_monthly_long_distance_charges = st.number_input("Avg Monthly Long Distance Charges", value=10.0)
 
-        try:
-            train_df=pd.read_csv(train_path)
-            test_df=pd.read_csv(test_path)
+    submitted = st.form_submit_button("Predict Churn")
 
-            logging.info("Read train and test data completed")
+# On submit
+if submitted:
+    with st.spinner("Predicting..."):
+        input_data = CustomData(
+            monthly_charge=monthly_charge,
+            zip_code=zip_code,
+            longitude=longitude,
+            age=age,
+            latitude=latitude,
+            total_long_distance_charges=total_long_distance_charges,
+            tenure_in_months=tenure_in_months,
+            total_revenue=total_revenue,
+            number_of_referrals=number_of_referrals,
+            total_charges=total_charges,
+            avg_monthly_long_distance_charges=avg_monthly_long_distance_charges,
+            avg_monthly_gb_download=avg_monthly_gb_download,
+            number_of_dependents=number_of_dependents,
+            engagement_score=engagement_score,
+            num_addon_services=num_addon_services,
+            city=city,
+            contract=contract,
+            payment_method=payment_method,
+            offer=offer,
+            paperless_billing=paperless_billing,
+            gender=gender,
+            married=married,
+            internet_type=internet_type
+        )
 
-            logging.info("Obtaining preprocessing object")
+        df = input_data.get_data_as_data_frame()
+        st.write("📄 Input Data Preview", df)
 
-            preprocessing_obj=self.get_data_transformer_object()
+        predictor = PredictPipeline()
+        result = predictor.predict(df)
 
-            target_column_name="customer_status"
-            numerical_columns = [
-                    'age', 'number_of_dependents', 'zip_code', 'latitude', 'longitude',
-                    'number_of_referrals', 'tenure_in_months', 'avg_monthly_long_distance_charges',
-                    'avg_monthly_gb_download', 'monthly_charge', 'total_charges',
-                    'total_refunds', 'total_extra_data_charges', 'total_long_distance_charges',
-                    'total_revenue', 'has_offer', 'offer_popularity'
-                ]
-
-            input_feature_train_df=train_df.drop(columns=[target_column_name],axis=1)
-            target_feature_train_df=train_df[target_column_name]
-
-            input_feature_test_df=test_df.drop(columns=[target_column_name],axis=1)
-            target_feature_test_df=test_df[target_column_name]
-
-            logging.info(
-                f"Applying preprocessing object on training dataframe and testing dataframe."
-            )
-
-            input_feature_train_arr=preprocessing_obj.fit_transform(input_feature_train_df)
-            input_feature_test_arr=preprocessing_obj.transform(input_feature_test_df)
-
-            train_arr = np.c_[input_feature_train_arr, np.array(target_feature_train_df)]
-            test_arr = np.c_[input_feature_test_arr, np.array(target_feature_test_df)]
-
-            logging.info(f"Saved preprocessing object.")
-
-            save_object(
-
-                file_path=self.data_transformation_config.preprocessor_obj_file_path,
-                obj=preprocessing_obj
-
-            )
-
-            return (
-                train_arr,
-                test_arr,
-                self.data_transformation_config.preprocessor_obj_file_path,
-            )
-        except Exception as e:
-            raise CustomException(e,sys)
+        prediction = "Churn" if result[0] == 1 else "Not Churn"
+        st.success(f"✅ The predicted customer status is: **{prediction}**")
