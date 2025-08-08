@@ -72,9 +72,11 @@ class ModelTrainer:
         return clean
 
     # ---------- MLFLOW HELPERS ----------
-    def _mlflow_start_run(self, **kwargs):
+    def _mlflow_start_run(self, run_name=None, **kwargs):
+        if run_name:
+            run_name = run_name.strip().replace(" ", "_")
         if self.enable_logging:
-            return mlflow.start_run(**kwargs)
+            return mlflow.start_run(run_name=run_name, **kwargs)
         return DummyContextManager()
 
     def _mlflow_log_params(self, params):
@@ -94,8 +96,13 @@ class ModelTrainer:
             mlflow.set_tag(key, value)
 
     def _mlflow_set_experiment(self, experiment_name):
+        clean_name = experiment_name.strip().replace(" ", "_")
         if self.enable_logging:
-            mlflow.set_experiment(experiment_name)
+            try:
+                mlflow.set_experiment(clean_name)
+            except Exception as e:
+                logging.error(f"Failed to set experiment {clean_name}: {e}")
+                raise
 
     # ---------- MODEL FACTORY ----------
     def _get_model_from_name(self, model_name, trial=None):
@@ -183,20 +190,35 @@ class ModelTrainer:
             logging.error(f"Insufficient positive samples ({n_pos}) for {model_name}")
             return 0.0, None, {}, {}
 
-        def _roc_auc_proba_scorer(y_true, y_proba):
+        def _roc_auc_proba_scorer(y_true, estimator, X):
+            """Robust ROC AUC scorer supporting predict_proba and decision_function."""
             try:
-                if y_proba.ndim == 1:
-                    return roc_auc_score(y_true, y_proba)
-                elif y_proba.shape[1] == 2:
-                    return roc_auc_score(y_true, y_proba[:, 1])
+                if hasattr(estimator, "predict_proba"):
+                    y_proba = estimator.predict_proba(X)
+                    if y_proba.ndim == 1:  # Single column
+                        return roc_auc_score(y_true, y_proba)
+                    elif y_proba.shape[1] == 2:
+                        return roc_auc_score(y_true, y_proba[:, 1])
+                    else:
+                        return roc_auc_score(y_true, y_proba, multi_class='ovr')
+                elif hasattr(estimator, "decision_function"):
+                    scores = estimator.decision_function(X)
+                    return roc_auc_score(y_true, scores)
                 else:
-                    return roc_auc_score(y_true, y_proba, multi_class='ovr')
+                    logging.error("Model has neither predict_proba nor decision_function")
+                    return 0.0
             except Exception as e:
                 logging.error(f"AUC calculation failed: {e}")
                 return 0.0
 
+
         scoring = {
-            'roc_auc': make_scorer(_roc_auc_proba_scorer, needs_proba=True),
+            'roc_auc': make_scorer(
+                lambda y_true, y_pred, **kwargs: _roc_auc_proba_scorer(
+                    y_true, kwargs.get('estimator'), kwargs.get('X')
+                ),
+                needs_proba=False
+            ),
             'accuracy': make_scorer(accuracy_score),
             'precision': make_scorer(precision_score, zero_division=0),
             'recall': make_scorer(recall_score, zero_division=0),
@@ -255,16 +277,21 @@ class ModelTrainer:
         y_proba = best_pipeline.predict_proba(X_test_df)[:, 1]
 
         test_metrics = {
-            "test_accuracy": accuracy_score(y_test, y_pred),
-            "test_precision": precision_score(y_test, y_pred, zero_division=0),
-            "test_recall": recall_score(y_test, y_pred, zero_division=0),
-            "test_f1": f1_score(y_test, y_pred, zero_division=0),
-            "test_auc": roc_auc_score(y_test, y_proba)
+            "Best_AUC": roc_auc_score(y_test, y_proba),
+            "Best_Accuracy": accuracy_score(y_test, y_pred),
+            "Best_Precision": precision_score(y_test, y_pred, zero_division=0),
+            "Best_Recall": recall_score(y_test, y_pred, zero_division=0),
+            "Best_F1": f1_score(y_test, y_pred, zero_division=0)
         }
-        return test_metrics["test_auc"], best_pipeline, study.best_params, test_metrics
+
+        if self.enable_logging:
+            mlflow.log_metrics(test_metrics)
+            mlflow.log_params(study.best_params)
+
+        return test_metrics["Best_AUC"], best_pipeline, study.best_params, test_metrics
 
     # ---------- MAIN TRAINER ----------
-    def initiate_model_trainer(self, train_arr, test_arr, n_trials=30, experiment_name="churn_prediction_experiments"):
+    def initiate_model_trainer(self, train_arr, test_arr, n_trials=5, experiment_name="churn_prediction_experiments"):
         try:
             X_train, y_train = train_arr[:, :-1], train_arr[:, -1]
             X_test, y_test = test_arr[:, :-1], test_arr[:, -1]
@@ -277,25 +304,42 @@ class ModelTrainer:
 
             model_names = ["Random Forest", "XGBoost", "LightGBM", "CatBoost", "SVM", "Logistic Regression"]
 
+            experiment_name = "churn_prediction_experiments"
+            self._mlflow_set_experiment(experiment_name)
+
             with self._mlflow_start_run(run_name="Best_Model_Run"):
                 for model_name in model_names:
-                    with self._mlflow_start_run(run_name=model_name, nested=True):
+                    safe_model_name = model_name.replace(" ", "_")
+                    with self._mlflow_start_run(run_name=safe_model_name, nested=True):
                         self._mlflow_set_tag("model_name", model_name)
                         try:
                             test_auc, model, params, metrics = self.optimize_model(
                                 model_name, X_train, y_train, X_test, y_test, n_trials=n_trials, experiment_name=experiment_name
                             )
-                            self._mlflow_log_params(self._sanitize_params(params))
-                            self._mlflow_log_metrics(self._sanitize_metrics(metrics))
 
+                            self._mlflow_log_metrics(self._sanitize_metrics(metrics))
+                            self._mlflow_log_params(self._sanitize_params(params))
+
+                            for k, v in metrics.items():
+                                mlflow.set_tag(f"best_{k}", round(v, 4))
+                            for k, v in params.items():
+                                mlflow.set_tag(f"param_{k}", v)
+
+                            # Track best overall model
                             if test_auc > best_overall_score:
                                 best_overall_score = test_auc
                                 best_overall_model = model
                                 best_model_name = model_name
                                 best_params = params
                                 best_metrics = metrics
+                                
                         except Exception as e:
                             logging.error(f"{model_name} failed: {e}")
+
+                mlflow.set_tag("best_model_name", best_model_name)
+                
+                mlflow.log_params(best_params)
+                mlflow.log_metrics(best_metrics)
 
                 if best_overall_model is None:
                     raise CustomException("No model trained successfully", sys)
