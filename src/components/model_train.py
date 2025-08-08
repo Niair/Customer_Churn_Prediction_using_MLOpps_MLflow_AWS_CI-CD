@@ -27,7 +27,14 @@ from src.logger import logging
 from src.utils import save_object
 
 # Initialize Dagshub
-dagshub.init(repo_owner='Niair', repo_name='Customer_Churn_Prediction_using_MLOpps_MLflow_AWS_CI-CD', mlflow=True)
+# Disable dagshub init in CI or when enable_logging=False
+if os.environ.get("CI") != "true" and os.environ.get("ENABLE_DAGSHUB", "false").lower() == "true":
+    dagshub.init(
+        repo_owner='Niair',
+        repo_name='Customer_Churn_Prediction_using_MLOpps_MLflow_AWS_CI-CD',
+        mlflow=True
+    )
+
 mlflow.set_tracking_uri("https://dagshub.com/Niair/Customer_Churn_Prediction_using_MLOpps_MLflow_AWS_CI-CD.mlflow")
 
 
@@ -47,6 +54,8 @@ class ModelTrainer:
     def __init__(self, enable_logging=True):
         self.model_trainer_config = ModelTrainerConfig()
         self.enable_logging = enable_logging
+        if self.enable_logging:
+            mlflow.start_run()
 
     # ---------- SANITIZATION HELPERS ----------
     def _sanitize_params(self, params: dict):
