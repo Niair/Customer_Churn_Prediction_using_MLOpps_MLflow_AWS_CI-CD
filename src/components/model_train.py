@@ -4,12 +4,11 @@ from dataclasses import dataclass
 
 import mlflow
 import dagshub
-
 import optuna
 import numpy as np
 import pandas as pd
 
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
@@ -17,38 +16,89 @@ from catboost import CatBoostClassifier
 from sklearn.svm import SVC
 
 from sklearn.metrics import (
-    roc_auc_score,
-    accuracy_score,
-    precision_score,
-    recall_score,
-    f1_score,
-    make_scorer
+    roc_auc_score, accuracy_score, precision_score, recall_score, f1_score, make_scorer
 )
-
-from sklearn.model_selection import StratifiedKFold
-from sklearn.model_selection import cross_validate
-
-from functools import partial
-
+from sklearn.model_selection import StratifiedKFold, cross_validate
 from imblearn.over_sampling import SMOTE
-from imblearn.pipeline import Pipeline as imblearn_Pipeline  # it is done like this to avoids name conflict
+from imblearn.pipeline import Pipeline as imblearn_Pipeline
+
 from src.exception import CustomException
 from src.logger import logging
-from src.utils import save_object, load_object
+from src.utils import save_object
 
+# Initialize Dagshub
 dagshub.init(repo_owner='Niair', repo_name='Customer_Churn_Prediction_using_MLOpps_MLflow_AWS_CI-CD', mlflow=True)
 mlflow.set_tracking_uri("https://dagshub.com/Niair/Customer_Churn_Prediction_using_MLOpps_MLflow_AWS_CI-CD.mlflow")
+
 
 @dataclass
 class ModelTrainerConfig:
     trained_model_file_path: str = os.path.join("artifacts", "model.pkl")
 
+
+class DummyContextManager:
+    def __enter__(self):
+        return self
+    def __exit__(self, *args):
+        pass
+
+
 class ModelTrainer:
-    def __init__(self):
+    def __init__(self, enable_logging=True):
         self.model_trainer_config = ModelTrainerConfig()
-    
+        self.enable_logging = enable_logging
+
+    # ---------- SANITIZATION HELPERS ----------
+    def _sanitize_params(self, params: dict):
+        clean = {}
+        for k, v in params.items():
+            key = str(k).replace(" ", "_").replace("-", "_")
+            if isinstance(v, (np.generic, np.ndarray)):
+                v = v.item()
+            if v is None or (isinstance(v, float) and (np.isnan(v) or np.isinf(v))):
+                v = "null"
+            clean[key] = str(v)
+        return clean
+
+    def _sanitize_metrics(self, metrics: dict):
+        clean = {}
+        for k, v in metrics.items():
+            key = str(k).replace(" ", "_").replace("-", "_")
+            if isinstance(v, (np.generic, np.ndarray)):
+                v = v.item()
+            if v is None or (isinstance(v, float) and (np.isnan(v) or np.isinf(v))):
+                v = 0.0
+            clean[key] = float(v)
+        return clean
+
+    # ---------- MLFLOW HELPERS ----------
+    def _mlflow_start_run(self, **kwargs):
+        if self.enable_logging:
+            return mlflow.start_run(**kwargs)
+        return DummyContextManager()
+
+    def _mlflow_log_params(self, params):
+        if self.enable_logging:
+            mlflow.log_params(params)
+
+    def _mlflow_log_metrics(self, metrics):
+        if self.enable_logging:
+            mlflow.log_metrics(metrics)
+
+    def _mlflow_log_artifact(self, local_path, artifact_path=None):
+        if self.enable_logging:
+            mlflow.log_artifact(local_path, artifact_path)
+
+    def _mlflow_set_tag(self, key, value):
+        if self.enable_logging:
+            mlflow.set_tag(key, value)
+
+    def _mlflow_set_experiment(self, experiment_name):
+        if self.enable_logging:
+            mlflow.set_experiment(experiment_name)
+
+    # ---------- MODEL FACTORY ----------
     def _get_model_from_name(self, model_name, trial=None):
-        
         if trial is None:
             if model_name == "Random Forest":
                 return RandomForestClassifier(random_state=42, class_weight='balanced')
@@ -64,20 +114,18 @@ class ModelTrainer:
                 return LogisticRegression(random_state=42, class_weight='balanced')
             else:
                 raise ValueError("Unsupported model")
-        
+        # With Optuna params
         if model_name == "Random Forest":
             return RandomForestClassifier(
                 n_estimators=trial.suggest_int("n_estimators", 50, 200),
                 max_depth=trial.suggest_int("max_depth", 5, 20),
                 min_samples_split=trial.suggest_int("min_samples_split", 2, 5),
                 min_samples_leaf=trial.suggest_int("min_samples_leaf", 1, 5),
-                class_weight='balanced', 
-                random_state=42
+                class_weight='balanced', random_state=42
             )
         elif model_name == "XGBoost":
             return XGBClassifier(
-                use_label_encoder=False,
-                eval_metric="logloss",
+                use_label_encoder=False, eval_metric="logloss",
                 n_estimators=trial.suggest_int("n_estimators", 50, 200),
                 learning_rate=trial.suggest_float("learning_rate", 0.05, 0.2, log=True),
                 max_depth=trial.suggest_int("max_depth", 3, 7),
@@ -100,36 +148,32 @@ class ModelTrainer:
                 learning_rate=trial.suggest_float("learning_rate", 0.05, 0.2, log=True),
                 depth=trial.suggest_int("depth", 4, 7),
                 l2_leaf_reg=trial.suggest_float("l2_leaf_reg", 1e-2, 5.0, log=True),
-                auto_class_weights='Balanced', 
-                random_seed=42
+                auto_class_weights='Balanced', random_seed=42
             )
         elif model_name == "SVM":
             return SVC(
                 probability=True,
                 C=trial.suggest_float("C", 0.1, 10.0, log=True),
                 kernel=trial.suggest_categorical("kernel", ["rbf", "linear"]),
-                class_weight='balanced', 
-                random_state=42
+                class_weight='balanced', random_state=42
             )
         elif model_name == "Logistic Regression":
             return LogisticRegression(
                 C=trial.suggest_float("C", 0.1, 5.0),
                 max_iter=trial.suggest_int("max_iter", 100, 300),
                 solver=trial.suggest_categorical("solver", ["lbfgs", "liblinear"]),
-                class_weight='balanced', 
-                random_state=42
+                class_weight='balanced', random_state=42
             )
-        else:
-            raise ValueError("Unsupported model")
 
+    # ---------- OPTIMIZATION ----------
     def optimize_model(self, model_name, X_train, y_train, X_test, y_test, n_trials=5, experiment_name="churn_prediction_experiments"):
-        mlflow.set_experiment(experiment_name)
+        self._mlflow_set_experiment(experiment_name)
+
         if not isinstance(X_train, pd.DataFrame):
             X_train_df = pd.DataFrame(X_train)
             X_test_df = pd.DataFrame(X_test)
         else:
-            X_train_df = X_train
-            X_test_df = X_test
+            X_train_df, X_test_df = X_train, X_test
 
         n_pos = np.sum(y_train == 1)
         n_neg = np.sum(y_train == 0)
@@ -158,176 +202,110 @@ class ModelTrainer:
             'recall': make_scorer(recall_score, zero_division=0),
             'f1': make_scorer(f1_score, zero_division=0)
         }
-        cv_strategy = StratifiedKFold(n_splits=1, shuffle=True, random_state=42)
+        cv_strategy = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
 
         def objective(trial):
             with mlflow.start_run(run_name=f"Trial_{trial.number}", nested=True):
                 model = self._get_model_from_name(model_name, trial)
-                
-                if model_name == "XGBoost":
+                if model_name in ["XGBoost", "LightGBM"]:
                     model.set_params(scale_pos_weight=scale_pos_weight)
-                elif model_name == "LightGBM":
-                    model.set_params(scale_pos_weight=scale_pos_weight)
-                
+
                 pipeline = imblearn_Pipeline([
                     ('smote', SMOTE(random_state=42)),
                     ('model', model)
                 ])
-                
+
                 try:
                     cv_results = cross_validate(
                         pipeline, X_train_df, y_train,
-                        cv=cv_strategy,
-                        scoring=scoring,
-                        return_train_score=False,
-                        n_jobs=-1
+                        cv=cv_strategy, scoring=scoring,
+                        return_train_score=False, n_jobs=-1
                     )
-                    mean_auc = np.mean(cv_results['test_roc_auc'])
-                    mean_accuracy = np.mean(cv_results['test_accuracy'])
-                    mean_precision = np.mean(cv_results['test_precision'])
-                    mean_recall = np.mean(cv_results['test_recall'])
-                    mean_f1 = np.mean(cv_results['test_f1'])
-                    
+
                     metrics_to_log = {
-                        "AUC": mean_auc,
-                        "Accuracy": mean_accuracy,
-                        "Precision": mean_precision,
-                        "Recall": mean_recall,
-                        "F1-Score": mean_f1
+                        "AUC": np.mean(cv_results['test_roc_auc']),
+                        "Accuracy": np.mean(cv_results['test_accuracy']),
+                        "Precision": np.mean(cv_results['test_precision']),
+                        "Recall": np.mean(cv_results['test_recall']),
+                        "F1_Score": np.mean(cv_results['test_f1'])
                     }
-                    for metric_name, value in metrics_to_log.items():
-                        if np.isnan(value) or np.isinf(value):
-                            logging.warning(f"Trial {trial.number} for {model_name}: {metric_name} is NaN/Inf. Setting to 0.0.")
-                            metrics_to_log[metric_name] = 0.0
-                    
-                    if np.isnan(metrics_to_log["AUC"]) or np.isinf(metrics_to_log["AUC"]):
-                         logging.warning(f"Trial {trial.number} for {model_name}: AUC is NaN/Inf. Pruning.")
-                         raise optuna.exceptions.TrialPruned()
-                    
-                    mlflow.log_params(trial.params)
-                    mlflow.log_metrics(metrics_to_log)
+                    mlflow.log_params(self._sanitize_params(trial.params))
+                    mlflow.log_metrics(self._sanitize_metrics(metrics_to_log))
+
                     return metrics_to_log["AUC"]
-                
+
                 except Exception as e:
-                    logging.error(f"Error during trial {trial.number} for {model_name}: {e}")
+                    logging.error(f"Error during trial {trial.number}: {e}")
                     return -1.0
 
         study = optuna.create_study(direction="maximize")
-        try:
-            study.optimize(objective, n_trials=n_trials, n_jobs=1)
-        except Exception as e:
-            logging.error(f"Optuna study failed: {e}")
-            raise e
-        
-        if not study.trials:
-            raise ValueError("No trials completed successfully.")
-        
+        study.optimize(objective, n_trials=n_trials, n_jobs=1)
+
         best_model = self._get_model_from_name(model_name, trial=optuna.trial.FixedTrial(study.best_params))
-        
-        if model_name == "XGBoost":
+        if model_name in ["XGBoost", "LightGBM"]:
             best_model.set_params(scale_pos_weight=scale_pos_weight)
-        elif model_name == "LightGBM":
-            best_model.set_params(scale_pos_weight=scale_pos_weight)
-        
+
         best_pipeline = imblearn_Pipeline([
             ('smote', SMOTE(random_state=42)),
             ('model', best_model)
         ])
-        
         best_pipeline.fit(X_train_df, y_train)
-        
-        if hasattr(best_pipeline, 'predict_proba'):
-            y_pred_proba = best_pipeline.predict_proba(X_test_df)[:, 1]
-        else:
-            y_pred_proba = best_pipeline.decision_function(X_test_df)
-        
-        y_pred = best_pipeline.predict(X_test_df)
-        
-        test_auc = roc_auc_score(y_test, y_pred_proba)
-        test_accuracy = accuracy_score(y_test, y_pred)
-        test_precision = precision_score(y_test, y_pred, zero_division=0)
-        test_recall = recall_score(y_test, y_pred, zero_division=0)
-        test_f1 = f1_score(y_test, y_pred, zero_division=0)
-        
-        return test_auc, best_pipeline, study.best_params, {
-            "test_accuracy": test_accuracy,
-            "test_precision": test_precision,
-            "test_recall": test_recall,
-            "test_f1": test_f1
-        }
 
+        y_pred = best_pipeline.predict(X_test_df)
+        y_proba = best_pipeline.predict_proba(X_test_df)[:, 1]
+
+        test_metrics = {
+            "test_accuracy": accuracy_score(y_test, y_pred),
+            "test_precision": precision_score(y_test, y_pred, zero_division=0),
+            "test_recall": recall_score(y_test, y_pred, zero_division=0),
+            "test_f1": f1_score(y_test, y_pred, zero_division=0),
+            "test_auc": roc_auc_score(y_test, y_proba)
+        }
+        return test_metrics["test_auc"], best_pipeline, study.best_params, test_metrics
+
+    # ---------- MAIN TRAINER ----------
     def initiate_model_trainer(self, train_arr, test_arr, n_trials=30, experiment_name="churn_prediction_experiments"):
         try:
-            logging.info("Splitting training and test arrays")
             X_train, y_train = train_arr[:, :-1], train_arr[:, -1]
             X_test, y_test = test_arr[:, :-1], test_arr[:, -1]
-            
-            best_overall_model_score = -1.0
+
+            best_overall_score = -1
             best_overall_model = None
-            best_overall_model_name = None
-            best_overall_model_params = {}
-            best_overall_additional_metrics = {}
-            
+            best_model_name = None
+            best_params = {}
+            best_metrics = {}
+
             model_names = ["Random Forest", "XGBoost", "LightGBM", "CatBoost", "SVM", "Logistic Regression"]
-            
-            with mlflow.start_run(run_name="Best_Model_Run") as parent_run:
+
+            with self._mlflow_start_run(run_name="Best_Model_Run"):
                 for model_name in model_names:
-                    with mlflow.start_run(nested=True):
-                        mlflow.set_tag("model_name", model_name)
+                    with self._mlflow_start_run(run_name=model_name, nested=True):
+                        self._mlflow_set_tag("model_name", model_name)
                         try:
-                            test_auc, model, best_params, additional_metrics = self.optimize_model(
-                                            model_name, X_train, y_train, X_test, y_test, n_trials=n_trials, experiment_name=experiment_name
+                            test_auc, model, params, metrics = self.optimize_model(
+                                model_name, X_train, y_train, X_test, y_test, n_trials=n_trials, experiment_name=experiment_name
                             )
-                            
-                            mlflow.log_params(best_params)
-                            mlflow.log_metric("Best_AUC", test_auc)
-                            mlflow.log_metric("Best_Accuracy", additional_metrics["test_accuracy"])
-                            mlflow.log_metric("Best_Precision", additional_metrics["test_precision"])
-                            mlflow.log_metric("Best_Recall", additional_metrics["test_recall"])
-                            mlflow.log_metric("Best_F1-Score", additional_metrics["test_f1"])
-                            
-                            model_path = os.path.join("temp_models", f"{model_name.replace(' ', '_')}_model.pkl")
-                            os.makedirs(os.path.dirname(model_path), exist_ok=True)
-                            save_object(file_path=model_path, obj=model)
-                            mlflow.log_artifact(local_path=model_path, artifact_path="model_artifacts")
-                            logging.info(f"Logged {model_name} model as artifact.")
-                            os.remove(model_path)
-                            
-                            if test_auc > best_overall_model_score:
+                            self._mlflow_log_params(self._sanitize_params(params))
+                            self._mlflow_log_metrics(self._sanitize_metrics(metrics))
+
+                            if test_auc > best_overall_score:
+                                best_overall_score = test_auc
                                 best_overall_model = model
-                                best_overall_model_score = test_auc
-                                best_overall_model_name = model_name
-                                best_overall_model_params = best_params
-                                best_overall_additional_metrics = additional_metrics
-                                
-                        except Exception as model_optim_e:
-                            logging.error(f"Model {model_name} failed: {model_optim_e}")
-                            mlflow.log_param(f"{model_name}_status", "Failed")
-                
+                                best_model_name = model_name
+                                best_params = params
+                                best_metrics = metrics
+                        except Exception as e:
+                            logging.error(f"{model_name} failed: {e}")
+
                 if best_overall_model is None:
-                    logging.error("All models failed training")
-                    return -1.0
-                
-                save_object(
-                    file_path=self.model_trainer_config.trained_model_file_path,
-                    obj=best_overall_model
-                )
-                
-                mlflow.log_param("Overall_Best_Model", best_overall_model_name)
-                mlflow.log_metrics({
-                    "Overall_Best_AUC": best_overall_model_score,
-                    "Overall_Best_Accuracy": best_overall_additional_metrics["test_accuracy"],
-                    "Overall_Best_Precision": best_overall_additional_metrics["test_precision"],
-                    "Overall_Best_Recall": best_overall_additional_metrics["test_recall"],
-                    "Overall_Best_F1-Score": best_overall_additional_metrics["test_f1"]
-                })
-                mlflow.log_artifact(
-                    local_path=self.model_trainer_config.trained_model_file_path,
-                    artifact_path="final_best_model"
-                )
-            
-            logging.info(f"Best model: {best_overall_model_name} with AUC: {best_overall_model_score}")
-            return best_overall_model_score
-        
+                    raise CustomException("No model trained successfully", sys)
+
+                save_object(self.model_trainer_config.trained_model_file_path, best_overall_model)
+                self._mlflow_log_params(self._sanitize_params({"Best_Model": best_model_name}))
+                self._mlflow_log_metrics(self._sanitize_metrics(best_metrics))
+
+                logging.info(f"Best model: {best_model_name} with AUC: {best_overall_score}")
+                return best_overall_score
+
         except Exception as e:
             raise CustomException(e, sys)
