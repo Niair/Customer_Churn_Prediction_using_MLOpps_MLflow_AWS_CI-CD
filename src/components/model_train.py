@@ -26,17 +26,6 @@ from src.exception import CustomException
 from src.logger import logging
 from src.utils import save_object
 
-# Initialize Dagshub
-# Disable dagshub init in CI or when enable_logging=False
-if os.environ.get("CI") != "true" and os.environ.get("ENABLE_DAGSHUB", "false").lower() == "true":
-    dagshub.init(
-        repo_owner='Niair',
-        repo_name='Customer_Churn_Prediction_using_MLOpps_MLflow_AWS_CI-CD',
-        mlflow=True
-    )
-
-mlflow.set_tracking_uri("https://dagshub.com/Niair/Customer_Churn_Prediction_using_MLOpps_MLflow_AWS_CI-CD.mlflow")
-
 
 @dataclass
 class ModelTrainerConfig:
@@ -54,8 +43,16 @@ class ModelTrainer:
     def __init__(self, enable_logging=True):
         self.model_trainer_config = ModelTrainerConfig()
         self.enable_logging = enable_logging
-        if self.enable_logging:
-            mlflow.start_run()
+        if self.enable_logging and os.environ.get("CI") != "true":
+            dagshub.init(
+                repo_owner='Niair',
+                repo_name='Customer_Churn_Prediction_using_MLOpps_MLflow_AWS_CI-CD',
+                mlflow=True
+            )
+            mlflow.set_tracking_uri(
+                "https://dagshub.com/Niair/Customer_Churn_Prediction_using_MLOpps_MLflow_AWS_CI-CD.mlflow"
+            )
+
 
     # ---------- SANITIZATION HELPERS ----------
     def _sanitize_params(self, params: dict):
@@ -300,7 +297,7 @@ class ModelTrainer:
         return test_metrics["Best_AUC"], best_pipeline, study.best_params, test_metrics
 
     # ---------- MAIN TRAINER ----------
-    def initiate_model_trainer(self, train_arr, test_arr, n_trials=5, experiment_name="churn_prediction_experiments"):
+    def initiate_model_trainer(self, train_arr, test_arr, n_trials=5, experiment_name="churn_prediction_experiments", model_names=None):
         try:
             X_train, y_train = train_arr[:, :-1], train_arr[:, -1]
             X_test, y_test = test_arr[:, :-1], test_arr[:, -1]
@@ -311,7 +308,8 @@ class ModelTrainer:
             best_params = {}
             best_metrics = {}
 
-            model_names = ["Random Forest", "XGBoost", "LightGBM", "CatBoost", "SVM", "Logistic Regression"]
+            if model_names is None:
+                model_names = ["Random Forest", "XGBoost", "LightGBM", "CatBoost", "SVM", "Logistic Regression"]
 
             experiment_name = "churn_prediction_experiments"
             self._mlflow_set_experiment(experiment_name)
