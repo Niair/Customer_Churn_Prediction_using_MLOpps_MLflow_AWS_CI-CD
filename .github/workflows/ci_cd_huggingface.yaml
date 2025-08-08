@@ -56,5 +56,6 @@ jobs:
           HF_USERNAME: ${{ secrets.HF_USERNAME }}
           HF_SPACE_NAME: ${{ secrets.HF_SPACE_NAME }}
         run: |
-          git remote add huggy https://huggingface.co/spaces/${HF_USERNAME}/${HF_SPACE_NAME}
+          git remote add huggy https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${HF_SPACE_NAME}
           git push huggy main --force
+
