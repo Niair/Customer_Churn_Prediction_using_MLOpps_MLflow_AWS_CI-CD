@@ -47,8 +47,8 @@ jobs:
 
       - name: Set up Git
         run: |
-          git config --global user.email "you@example.com"
-          git config --global user.name "your-username"
+          git config --global user.email "${{ github.actor }}@users.noreply.github.com"
+          git config --global user.name "${{ github.actor }}"
 
       - name: Push to Hugging Face Space
         env:
@@ -57,5 +57,4 @@ jobs:
           HF_SPACE_NAME: ${{ secrets.HF_SPACE_NAME }}
         run: |
           git remote add huggy https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${HF_SPACE_NAME}
-          git push huggy main --force
-
+          git push huggy HEAD:main --force
