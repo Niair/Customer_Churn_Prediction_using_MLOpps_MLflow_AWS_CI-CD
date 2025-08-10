@@ -1,4 +1,4 @@
-name: CI/CD — Deploy to Hugging Face via Private Docker Image
+name: CI/CD — Deploy to Hugging Face via Docker Image
 
 on:
   push:
@@ -29,7 +29,7 @@ jobs:
         run: pytest tests/
 
   build_and_push_docker:
-    name: Build & Push Private Docker Image
+    name: Build & Push Docker Image
     runs-on: ubuntu-latest
     needs: integration
     steps:
@@ -37,12 +37,20 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Log in to Docker Hub
-        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push Docker image
-        run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/customer_churn_app:latest .
-          docker push ${{ secrets.DOCKER_USERNAME }}/customer_churn_app:latest
+      - name: Build Docker image
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/customer_churn_app:latest .
+
+      - name: Push Docker image (public or private depending on Docker Hub repo settings)
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/customer_churn_app:latest
+
+      # Optional: Push a private-tagged version
+      # - name: Push private-tagged image
+      #   run: docker push ${{ secrets.DOCKER_USERNAME }}/private_customer_churn_app:latest
 
   deploy:
     name: CD — Trigger Hugging Face Deployment
@@ -53,7 +61,7 @@ jobs:
         run: |
           git clone https://huggingface.co/spaces/NihalNiair/customer_churn_app space_repo
           cd space_repo
-          echo "FROM docker.io/${DOCKER_USERNAME}/customer_churn_app:latest" > Dockerfile
+          echo "FROM docker.io/${{ secrets.DOCKER_USERNAME }}/customer_churn_app:latest" > Dockerfile
           git config --global user.email "${{ secrets.GIT_EMAIL }}"
           git config --global user.name "${{ secrets.GIT_USERNAME }}"
           git add Dockerfile
