@@ -179,7 +179,7 @@ class ModelTrainer:
             )
 
     # ---------- OPTIMIZATION ----------
-    def optimize_model(self, model_name, X_train, y_train, X_test, y_test, n_trials=5, experiment_name="churn_prediction_experiments"):
+    def optimize_model(self, model_name, X_train, y_train, X_test, y_test, n_trials=30, experiment_name="churn_prediction_experiment_main"):
         self._mlflow_set_experiment(experiment_name)
 
         if not isinstance(X_train, pd.DataFrame):
@@ -230,7 +230,7 @@ class ModelTrainer:
             'recall': make_scorer(recall_score, zero_division=0),
             'f1': make_scorer(f1_score, zero_division=0)
         }
-        cv_strategy = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
+        cv_strategy = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
         def objective(trial):
             with mlflow.start_run(run_name=f"Trial_{trial.number}", nested=True):
@@ -297,7 +297,7 @@ class ModelTrainer:
         return test_metrics["Best_AUC"], best_pipeline, study.best_params, test_metrics
 
     # ---------- MAIN TRAINER ----------
-    def initiate_model_trainer(self, train_arr, test_arr, n_trials=5, experiment_name="churn_prediction_experiments", model_names=None):
+    def initiate_model_trainer(self, train_arr, test_arr, n_trials=30, experiment_name="churn_prediction_experiment_main", model_names=None):
         try:
             X_train, y_train = train_arr[:, :-1], train_arr[:, -1]
             X_test, y_test = test_arr[:, :-1], test_arr[:, -1]
@@ -311,7 +311,7 @@ class ModelTrainer:
             if model_names is None:
                 model_names = ["Random Forest", "XGBoost", "LightGBM", "CatBoost", "SVM", "Logistic Regression"]
 
-            experiment_name = "churn_prediction_experiments"
+            experiment_name = "churn_prediction_experiment_main"
             self._mlflow_set_experiment(experiment_name)
 
             with self._mlflow_start_run(run_name="Best_Model_Run"):
