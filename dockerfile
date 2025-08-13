@@ -17,8 +17,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Now copy the entire application
 COPY . .
 
-# Set port configuration
 ARG PORT=7860
 ENV PORT=$PORT
 
-CMD ["sh", "-c", "streamlit run app.py --server.address=0.0.0.0 --server.port=$PORT"]
+# Configure for headless server environment
+ENV STREAMLIT_SERVER_HEADLESS=true
+
+# Use PORT environment variable in command
+CMD ["sh", "-c", "streamlit run app.py --server.address=127.0.0.1 --server.port=$PORT"]

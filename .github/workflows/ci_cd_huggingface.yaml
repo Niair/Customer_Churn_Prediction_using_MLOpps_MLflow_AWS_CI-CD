@@ -53,20 +53,20 @@ jobs:
         run: |
           git clone https://huggingface.co/spaces/NihalNiair/customer_churn_app space_repo
           cd space_repo
-          
-          # Create Dockerfile with explicit port configuration
+            
+          # Create Dockerfile with correct configuration
           echo "FROM ${{ secrets.DOCKER_USERNAME }}/customer_churn_app:latest" > Dockerfile
           echo "ENV PORT=7860" >> Dockerfile
           echo "EXPOSE 7860" >> Dockerfile
-          echo 'CMD ["sh", "-c", "streamlit run app.py --server.address=0.0.0.0 --server.port=7860"]' >> Dockerfile
+          echo 'CMD ["sh", "-c", "streamlit run app.py --server.address=127.0.0.1 --server.port=7860"]' >> Dockerfile
 
           git config --global user.email "${{ secrets.GIT_EMAIL }}"
           git config --global user.name "${{ secrets.GIT_USERNAME }}"
           git add Dockerfile
-          
+            
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
-            git commit -m "Force Streamlit to use port 7860"
+            git commit -m "Fix server binding for Hugging Face"
             git push https://NihalNiair:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/NihalNiair/customer_churn_app main
           fi

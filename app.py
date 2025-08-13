@@ -7,7 +7,9 @@ import os
 st.set_page_config(page_title="Customer Churn Predictor", page_icon="📉", layout="centered")
 
 os.environ["STREAMLIT_SERVER_PORT"] = "7860"
-os.environ["STREAMLIT_SERVER_ADDRESS"] = "0.0.0.0"
+os.environ["STREAMLIT_SERVER_ADDRESS"] = "127.0.0.1"
+os.environ["STREAMLIT_SERVER_HEADLESS"] = "true"
+os.environ["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"
 
 st.title("📉 Customer Churn Prediction App")
 st.markdown("Predict whether a customer is likely to churn based on their telecom usage and demographic data.")
