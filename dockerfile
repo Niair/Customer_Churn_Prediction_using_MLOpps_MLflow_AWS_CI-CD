@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt || true
 COPY . .
 RUN pip install .
 
-EXPOSE 5000
-ENV PORT=5000
+# Don't hardcode port — HF will set it in $PORT
+ENV PORT=${PORT:-7860}
 
-CMD ["streamlit", "run", "./app.py", "--server.address=0.0.0.0", "--server.port=5000"]
+CMD ["sh", "-c", "streamlit run app.py --server.address=0.0.0.0 --server.port=$PORT"]
