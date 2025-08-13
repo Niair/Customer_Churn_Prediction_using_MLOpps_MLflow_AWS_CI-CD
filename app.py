@@ -3,10 +3,11 @@ import pandas as pd
 from src.pipeline.predict_pipeline import CustomData, PredictPipeline
 import os
 
-port = int(os.environ.get("PORT", 7860))
-
 # Streamlit page setup
 st.set_page_config(page_title="Customer Churn Predictor", page_icon="📉", layout="centered")
+
+os.environ["STREAMLIT_SERVER_PORT"] = "7860"
+os.environ["STREAMLIT_SERVER_ADDRESS"] = "0.0.0.0"
 
 st.title("📉 Customer Churn Prediction App")
 st.markdown("Predict whether a customer is likely to churn based on their telecom usage and demographic data.")

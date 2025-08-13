@@ -41,7 +41,6 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          # Build public image by default
           docker build -t ${{ secrets.DOCKER_USERNAME }}/customer_churn_app:latest .
           docker push ${{ secrets.DOCKER_USERNAME }}/customer_churn_app:latest
 
@@ -55,10 +54,11 @@ jobs:
           git clone https://huggingface.co/spaces/NihalNiair/customer_churn_app space_repo
           cd space_repo
           
-          # Public image configuration with PORT setup
+          # Create Dockerfile with explicit port configuration
           echo "FROM ${{ secrets.DOCKER_USERNAME }}/customer_churn_app:latest" > Dockerfile
-          echo "ARG PORT=7860" >> Dockerfile
-          echo "ENV PORT=\$PORT" >> Dockerfile
+          echo "ENV PORT=7860" >> Dockerfile
+          echo "EXPOSE 7860" >> Dockerfile
+          echo 'CMD ["sh", "-c", "streamlit run app.py --server.address=0.0.0.0 --server.port=7860"]' >> Dockerfile
 
           git config --global user.email "${{ secrets.GIT_EMAIL }}"
           git config --global user.name "${{ secrets.GIT_USERNAME }}"
@@ -67,6 +67,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
-            git commit -m "Update Dockerfile to pull latest image with PORT configuration"
+            git commit -m "Force Streamlit to use port 7860"
             git push https://NihalNiair:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/NihalNiair/customer_churn_app main
           fi
