@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 from src.pipeline.predict_pipeline import CustomData, PredictPipeline
+import os
+
+port = int(os.environ.get("PORT", 7860))
 
 # Streamlit page setup
 st.set_page_config(page_title="Customer Churn Predictor", page_icon="📉", layout="centered")

@@ -45,10 +45,6 @@ jobs:
           docker build -t ${{ secrets.DOCKER_USERNAME }}/customer_churn_app:latest .
           docker push ${{ secrets.DOCKER_USERNAME }}/customer_churn_app:latest
 
-          # For private image (comment out above and uncomment below when needed)
-          # docker build -t ${{ secrets.DOCKER_USERNAME }}/customer_churn_app:private .
-          # docker push ${{ secrets.DOCKER_USERNAME }}/customer_churn_app:private
-
   deploy:
     name: CD — Trigger Hugging Face Deployment
     runs-on: ubuntu-latest
@@ -59,14 +55,10 @@ jobs:
           git clone https://huggingface.co/spaces/NihalNiair/customer_churn_app space_repo
           cd space_repo
           
-          # Public image configuration
+          # Public image configuration with PORT setup
           echo "FROM ${{ secrets.DOCKER_USERNAME }}/customer_churn_app:latest" > Dockerfile
-          
-          # For private image (uncomment above and comment below when needed)
-          # echo "FROM ${{ secrets.DOCKER_USERNAME }}/customer_churn_app:private" > Dockerfile
-          # echo "ARG DOCKER_USERNAME" >> Dockerfile
-          # echo "ARG DOCKER_PASSWORD" >> Dockerfile
-          # echo "RUN echo \"$DOCKER_PASSWORD\" | docker login -u \"$DOCKER_USERNAME\" --password-stdin" >> Dockerfile
+          echo "ARG PORT=7860" >> Dockerfile
+          echo "ENV PORT=\$PORT" >> Dockerfile
 
           git config --global user.email "${{ secrets.GIT_EMAIL }}"
           git config --global user.name "${{ secrets.GIT_USERNAME }}"
@@ -75,6 +67,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
-            git commit -m "Update Dockerfile to pull latest image"
+            git commit -m "Update Dockerfile to pull latest image with PORT configuration"
             git push https://NihalNiair:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/NihalNiair/customer_churn_app main
           fi
