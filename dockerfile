@@ -8,12 +8,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt 
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
-RUN pip install .
 
-# Don't hardcode port — HF will set it in $PORT
 ENV PORT=${PORT:-7860}
 
 CMD ["sh", "-c", "streamlit run app.py --server.address=0.0.0.0 --server.port=$PORT"]
