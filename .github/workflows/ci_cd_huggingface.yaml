@@ -58,7 +58,7 @@ jobs:
           echo "FROM ${{ secrets.DOCKER_USERNAME }}/customer_churn_app:latest" > Dockerfile
           echo "ENV PORT=7860" >> Dockerfile
           echo "EXPOSE 7860" >> Dockerfile
-          echo 'CMD ["sh", "-c", "streamlit run app.py --server.address=127.0.0.1 --server.port=7860"]' >> Dockerfile
+          echo 'CMD ["sh", "-c", "streamlit run app.py --server.address=0.0.0.0 --server.port=$PORT"]' >> Dockerfile
 
           git config --global user.email "${{ secrets.GIT_EMAIL }}"
           git config --global user.name "${{ secrets.GIT_USERNAME }}"
