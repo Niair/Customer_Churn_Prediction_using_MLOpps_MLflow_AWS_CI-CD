@@ -25,4 +25,4 @@ ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
 EXPOSE $PORT
 
 # Always bind to 0.0.0.0 and use HF's dynamic port
-CMD ["sh", "-c", "streamlit run app.py --server.address=0.0.0.0 --server.port=$PORT"]
+CMD streamlit run app.py --server.port $PORT --server.address 0.0.0.0
