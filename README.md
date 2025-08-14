@@ -17,7 +17,9 @@ This project uses:
 
 Add your recorded project walkthrough/demo video here:
 
-* 🎥 **YouTube Link**: [Watch Demo](https://youtube.com/...)
+**App Link**: [Watch Demo](https://customer-churn-prediction-11x8.onrender.com)
+
+**YouTube Link**: [Watch Demo](https://youtube.com/...)
 
 
 ---
@@ -75,11 +77,11 @@ You can use this project to:
 
 ## 🧠 Best Model & Experiment Tracking (MLflow)
 
-* 🔍 **Model Used**: `CatBoostClassifier`
+* 🔍 **Model Used**: `XGBoost`
 * 🧪 **Hyperparameter Tuning**: Performed using `Optuna`
 * 🧪 **No. of Trials**: `30`
 * 🔁 **Cross Validation**: `5-Fold Stratified K-Fold`
-* 🥇 **Best AUC Score**: `0.912`
+* 🥇 **Best AUC Score**: `0.91`
 
 ### 📷 Screenshot placeholder
 
@@ -88,7 +90,7 @@ You can use this project to:
 ![MLflow Screenshot](assets/mlflow_best_model.png)
 
 📎 **MLflow Tracking UI (hosted on DagsHub)**
-[🔗 MLflow UI Link](https://dagshub.com/<your_username>/Customer_Churn_Prediction_with_MLOps.mlflow)
+[🔗 MLflow UI Link](https://dagshub.com/Niair/Customer_Churn_Prediction_using_MLOpps_MLflow_AWS_CI-CD.mlflow/#/experiments/40?searchFilter=&orderByKey=attributes.start_time&orderByAsc=false&startTime=ALL&lifecycleFilter=Active&modelVersionFilter=All+Runs&datasetsFilter=W10%3D)
 
 ---
 
@@ -109,7 +111,7 @@ docker run -p 5000:5000 churn-prediction
 ### 📥 Pull Prebuilt Image from DockerHub
 
 ```bash
-docker pull <your-dockerhub-username>/churn-prediction
+docker pull niair/customer_churn_app
 ```
 
 ---

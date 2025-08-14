@@ -54,8 +54,11 @@ jobs:
           git clone https://huggingface.co/spaces/NihalNiair/customer_churn_app space_repo
           cd space_repo
 
-          # Copy our local Dockerfile into the Space repo
-          cp ../Dockerfile ./Dockerfile
+          # Generate Dockerfile instead of copying
+          echo "FROM ${{ secrets.DOCKER_USERNAME }}/customer_churn_app:latest" > Dockerfile
+          echo "ENV PORT=7860" >> Dockerfile
+          echo "EXPOSE 7860" >> Dockerfile
+          echo 'CMD ["sh", "-c", "streamlit run app.py --server.address=0.0.0.0 --server.port=$PORT"]' >> Dockerfile
 
           git config --global user.email "${{ secrets.GIT_EMAIL }}"
           git config --global user.name "${{ secrets.GIT_USERNAME }}"
