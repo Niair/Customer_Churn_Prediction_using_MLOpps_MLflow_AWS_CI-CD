@@ -8,20 +8,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # First copy ONLY setup and requirements files
-COPY setup.py .
-COPY requirements.txt .
+COPY setup.py ./
+COPY requirements.txt ./
 
-# Install dependencies (including editable install)
+# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Now copy the entire application
 COPY . .
 
-ARG PORT=7860
-ENV PORT=$PORT
-
-# Configure for headless server environment
+# Streamlit runs on a dynamic port set by HF
 ENV STREAMLIT_SERVER_HEADLESS=true
+ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
 
-# Use PORT environment variable in command
+# Expose $PORT (Hugging Face sets it automatically)
+EXPOSE $PORT
+
+# Always bind to 0.0.0.0 and use HF's dynamic port
 CMD ["sh", "-c", "streamlit run app.py --server.address=0.0.0.0 --server.port=$PORT"]
