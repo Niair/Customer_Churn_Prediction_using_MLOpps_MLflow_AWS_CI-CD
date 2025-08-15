@@ -56,11 +56,11 @@ jobs:
           cd hf_space
 
           # Create a README.md file that points to your Docker Hub image.
-          # This is the modern way to configure a Docker Space.
           echo '---' > README.md
           echo 'title: Customer Churn Predictor' >> README.md
           echo 'sdk: docker' >> README.md
-          echo 'app_file: app.py' >> README.md
+          # --- THIS IS THE NEW, CRUCIAL LINE ---
+          echo 'docker_image: ${{ secrets.DOCKER_USERNAME }}/customer_churn_app:latest' >> README.md
           echo '---' >> README.md
           
           # Configure git
@@ -69,7 +69,6 @@ jobs:
           
           # Commit and push the README.md file
           git add README.md
-          # Check if there are changes to commit
           if git diff --cached --quiet; then
             echo "No changes to README.md, deployment is already up to date."
           else
