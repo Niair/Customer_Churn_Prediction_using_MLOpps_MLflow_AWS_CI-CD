@@ -6,8 +6,8 @@ import os
 # Streamlit page setup
 st.set_page_config(page_title="Customer Churn Predictor", page_icon="📉", layout="centered")
 
-#port = int(os.environ.get("PORT", 7860))
-#os.system(f"streamlit run app.py --server.port {port} --server.address 0.0.0.0")
+port = int(os.environ.get("PORT", 7860))
+os.system(f"streamlit run app.py --server.port {port} --server.address 0.0.0.0")
 os.environ["STREAMLIT_SERVER_HEADLESS"] = "true"
 os.environ["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"
 
