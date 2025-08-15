@@ -1,0 +1,30 @@
+# Git
+.git
+.gitignore
+
+# Docker
+.dockerignore
+Dockerfile
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+
+# IDE / Editor specific
+.vscode/
+.idea/
+
+# Testing
+tests/
+.pytest_cache/
+pytest-results.xml
+
+# Other
+*.ipynb
+README.md
