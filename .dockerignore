@@ -28,3 +28,12 @@ pytest-results.xml
 # Other
 *.ipynb
 README.md
+
+# Ignore big local folders
+mlruns/
+notebooks/
+logs/
+data/
+tests/
+catboost_info/
+Customer_Churn.egg-info/

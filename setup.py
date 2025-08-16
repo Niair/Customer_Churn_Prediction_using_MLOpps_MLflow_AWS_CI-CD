@@ -22,7 +22,7 @@ setup(
       name = 'Customer_Churn',
       version = '0.0.1',
       author = 'Nihal',
-      author_email = 'niair2180@gmail.com',
+      author_email = 'nihalk2180@outlook.com',
       packages = find_packages(),
       install_requires = get_requirements('requirements.txt')
 )

@@ -1,0 +1,22 @@
+numpy
+pandas
+matplotlib
+seaborn
+scikit-learn==1.6.1
+catboost
+xgboost
+optuna
+category_encoders
+lightgbm
+dill
+nbformat
+plotly
+dvc
+streamlit
+shap
+mlflow
+dagshub
+pytest
+optuna-integration[mlflow]
+imbalanced-learn
+-e .

@@ -1,47 +1,81 @@
-# ---- Stage 1: Build ----
-# Use the full Python image to build dependencies, which has necessary build tools.
-FROM python:3.11-slim-bullseye AS builder
+# Lightweight Python base
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# Install only required system deps (no compilers)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Create and activate a virtual environment
-ENV VIRTUAL_ENV=/opt/venv
-RUN python3 -m venv $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+# Copy minimal requirements
+COPY requirements.txt .
 
-# Copy only necessary files and install dependencies into the venv
-COPY requirements.txt setup.py ./
+# Install only inference dependencies (scikit-learn, pandas, streamlit, etc.)
 RUN pip install --no-cache-dir -r requirements.txt
 
-# ---- Stage 2: Final Image ----
-# Use a slim image for the final product to keep it small.
-FROM python:3.11-slim-bullseye
+# Copy only what’s needed for inference
+COPY app.py .
+COPY src/pipeline/ ./src/pipeline/
+COPY src/utils.py ./src/
+COPY src/exception.py ./src/
+COPY src/logger.py ./src/
+COPY artifacts/model.pkl ./artifacts/model.pkl
+COPY artifacts/preprocessor.pkl ./artifacts/preprocessor.pkl
+# COPY artifacts/ ./artifacts/  # for both training + prediction
 
-WORKDIR /app
-
-# Copy the virtual environment from the builder stage
-COPY --from=builder /opt/venv /opt/venv
-
-# Copy the application source code
-COPY . .
-
-# Activate the virtual environment
-ENV PATH="/opt/venv/bin:$PATH"
-
-# Set Streamlit-specific environment variables
-ENV STREAMLIT_SERVER_HEADLESS=true
-ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
-
-# Hugging Face Spaces provides the PORT environment variable.
-# Default to 7860 if not provided.
+# Expose Streamlit port
 EXPOSE 7860
-ENV PORT=7860
 
-# The command to run the app. This is the correct way to start the server.
-# It uses the $PORT variable provided by Hugging Face Spaces.
-CMD ["streamlit", "run", "app.py", "--server.port", "$PORT", "--server.address", "0.0.0.0"]
+# Run Streamlit app
+CMD ["streamlit", "run", "app.py", "--server.port=7860", "--server.address=0.0.0.0"]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# (For both training + prediction)
+
+## Use a lightweight Python image
+#FROM python:3.11-slim
+#
+## Set working directory
+#WORKDIR /app
+#
+## Install only necessary system dependencies
+#RUN apt-get update && apt-get install -y --no-install-recommends \
+#    build-essential gcc curl \
+#    && rm -rf /var/lib/apt/lists/*
+#
+## Copy requirements first (for caching)
+#COPY requirements.txt .
+#
+## Install Python dependencies
+#RUN pip install --no-cache-dir --upgrade pip \
+#    && pip install --no-cache-dir -r requirements.txt
+#
+## Copy the application code
+#COPY . .
+#
+## Copy trained model artifacts
+#COPY artifacts/ /app/artifacts/
+#
+## Expose port for Hugging Face Spaces (uses $PORT automatically)
+#EXPOSE 7860
+#
+## Command to run Streamlit app
+#CMD ["streamlit", "run", "app.py", "--server.port=7860", "--server.address=0.0.0.0"]
+#
