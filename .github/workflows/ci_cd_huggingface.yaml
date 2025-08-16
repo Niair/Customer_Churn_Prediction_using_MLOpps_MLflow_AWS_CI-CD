@@ -25,7 +25,9 @@ jobs:
           pip install -r requirements-train.txt
 
       - name: Run unit tests
-        run: pytest tests/
+        run: |
+          export PYTHONPATH=.
+          pytest -v tests/
 
   build_and_push_docker:
     name: Build & Push Docker Image
