@@ -20,10 +20,9 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Install dependencies (training + dev)
         run: |
-          pip install -r requirements.txt
-          pip install dagshub
+          pip install -r requirements-train.txt
 
       - name: Run unit tests
         run: pytest tests/

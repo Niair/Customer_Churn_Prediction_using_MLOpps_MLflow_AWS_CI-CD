@@ -19,4 +19,4 @@ dagshub
 pytest
 optuna-integration[mlflow]
 imbalanced-learn
--e .
+# -e .
