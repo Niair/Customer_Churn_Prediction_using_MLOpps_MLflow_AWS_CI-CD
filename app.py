@@ -1,7 +1,12 @@
+import os
+
+os.environ["HOME"] = "/tmp"
+os.environ["STREAMLIT_HOME"] = "/tmp/.streamlit"
+os.makedirs(os.environ["STREAMLIT_HOME"], exist_ok=True)
+
 import streamlit as st
 import pandas as pd
 from src.pipeline.predict_pipeline import CustomData, PredictPipeline
-import os
 
 # Streamlit page setup
 st.set_page_config(page_title="Customer Churn Predictor", page_icon="📉", layout="centered")
