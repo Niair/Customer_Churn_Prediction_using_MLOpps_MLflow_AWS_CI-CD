@@ -18,6 +18,7 @@ This project uses:
 Add your recorded project walkthrough/demo video here:
 
 **App Link Render Simple Deploynment**: [Watch Demo](https://customer-churn-prediction-11x8.onrender.com)
+
 **App Link Huggingface**: [Watch Demo](https://huggingface.co/spaces/NihalNiair/customer_churn_app_using_cicd)
 
 **YouTube Link**: [Watch Demo](https://youtube.com/...)
