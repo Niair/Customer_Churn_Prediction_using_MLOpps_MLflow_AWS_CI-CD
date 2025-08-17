@@ -8,7 +8,7 @@ This project uses:
 - DagsHub for version control and remote DVC & MLflow hosting
 - CI/CD pipelines (GitHub Actions)
 - Docker for environment reproducibility
-- Deployment on **Heroku** and **AWS EC2**
+- Deployment on **Huggingface** and **AWS EC2**
 - Automated testing using PyTest
 
 ---
@@ -17,8 +17,8 @@ This project uses:
 
 Add your recorded project walkthrough/demo video here:
 
-**App Link**: [Watch Demo](https://customer-churn-prediction-11x8.onrender.com)
-**App Link**: [Watch Demo](https://huggingface.co/spaces/NihalNiair/customer_churn_app_cicd)
+**App Link Render Simple Deploynment**: [Watch Demo](https://customer-churn-prediction-11x8.onrender.com)
+**App Link Huggingface**: [Watch Demo](https://huggingface.co/spaces/NihalNiair/customer_churn_app_using_cicd)
 
 **YouTube Link**: [Watch Demo](https://youtube.com/...)
 
@@ -66,12 +66,13 @@ This project aims to identify customers likely to **churn** using key attributes
 * Contract details
 * Monthly charges
 * Internet service
+* etc..
 
 You can use this project to:
 
 * Practice **end-to-end MLOps**
 * Learn model tracking with **MLflow**
-* Deploy ML models with **Docker**, **Heroku**, or **AWS**
+* Deploy ML models with **Docker**, **Huggingface**, or **AWS**
 * Implement **CI/CD workflows** for training + deployment
 
 ---
@@ -106,7 +107,7 @@ docker build -t churn-prediction .
 ### ▶️ Run Docker Container
 
 ```bash
-docker run -p 5000:5000 churn-prediction
+docker run -p 7860:7860 churn-prediction
 ```
 
 ### 📥 Pull Prebuilt Image from DockerHub
@@ -119,12 +120,12 @@ docker pull niair/customer_churn_app
 
 ## ☁️ Deployment Instructions
 
-### 🔹 Heroku Deployment
+### 🔹 Huggingface Deployment
 
-1. Install Heroku CLI
-2. Login using `heroku login`
-3. Push code to Heroku Git
-4. App will automatically be deployed via CI/CD pipeline
+1. Make sure you have a repo on Hugging Face (not just GitHub).
+2. Connect your GitHub repo to Hugging Face (or push directly).
+3. Add a .github/workflows/huggingface.yml (GitHub Actions CI/CD file).
+4. Whenever you push to GitHub, GitHub Actions will build and deploy automatically to Hugging Face.
 
 ---
 
@@ -149,15 +150,15 @@ CI/CD pipelines are configured using **GitHub Actions** in:
 
 ```
 .github/workflows/
-├── cicd_heroku.yml
-├── cicd_aws.yml
+├── ci_cd_huggingface.yaml
+├── ci_cd_aws.yaml
 ```
 
 These handle:
 
 * ✅ Code testing via PyTest
-* 🔁 Docker image build & push
-* 🚀 Automatic deployment to Heroku/AWS
+* 🔁 Docker image build & push in the Huggingface
+* 🚀 Automatic deployment to huggingface/AWS
 
 ---
 
@@ -204,5 +205,3 @@ Pull requests are welcome! For major changes, please open an issue first to disc
 
 * **Author**: Nihal
 * **GitHub**: [@Niair](https://github.com/Niair)
-
-```
