@@ -88,8 +88,6 @@ You can use this project to:
 
 ### 📷 Screenshot placeholder
 
-> Paste your MLflow screenshot here:
-
 ![MLflow Screenshot](assets/mlflow_best_model.png)
 
 📎 **MLflow Tracking UI (hosted on DagsHub)**
