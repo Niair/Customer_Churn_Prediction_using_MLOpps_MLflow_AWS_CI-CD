@@ -45,12 +45,12 @@ jobs:
         run: |
           git clone "https://NihalNiair:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/NihalNiair/customer_churn_app_using_cicd" hf_space
           
-          # Copy only necessary files/folders (ignore if missing)
+          # Copy only necessary files/folders
           rsync -av --ignore-missing-args \
             Dockerfile \
             app.py \
             requirements.txt \
-            # .gitattributes \
+            .gitattributes \
             artifacts \
             src \
             README.md \
