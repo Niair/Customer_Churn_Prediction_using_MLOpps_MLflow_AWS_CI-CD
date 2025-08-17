@@ -36,14 +36,17 @@ jobs:
       - name: Checkout repository (with LFS)
         uses: actions/checkout@v3
         with:
-          lfs: true   # ensures model.pkl is downloaded
+          lfs: true
+
+      - name: Debug — List repo files
+        run: ls -R
 
       - name: Push latest code to Hugging Face Space
         run: |
           git clone "https://NihalNiair:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/NihalNiair/customer_churn_app_using_cicd" hf_space
           
-          # Copy only necessary files/folders
-          rsync -av \
+          # Copy only necessary files/folders (ignore if missing)
+          rsync -av --ignore-missing-args \
             Dockerfile \
             app.py \
             requirements.txt \
